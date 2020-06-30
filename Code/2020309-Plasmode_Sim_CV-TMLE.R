@@ -45,6 +45,7 @@ registerDoParallel(cores = detectCores(all.tests = T))
 # varnames <- paste0(rep("VAR_", length(vars)), as.character(seq(1,length(vars)), 1))
 # plas %>% rename_at(vars(vars), ~varnames) %>% write_dta(., paste0(out_path,"plas_data.dta"))
 
+out_path <- "~/Desktop/HuangGroup/cvtmle_plasmode/Data/"
 plas <- haven::read_dta(paste0(out_path,"plas_data.dta")) 
 vars <- names(plas[3:333])
 
@@ -73,6 +74,7 @@ plas <- data.frame(plas)
 plas_sim_N <- 500
 Effect_Size <- 6.6 # simulated risk difference = large change (e.g. absolute units)
 #Effect_Size <- 0.66 # simulated risk difference = 2/3 SD higher BMI
+# source("20200226-PlasmodeCont_Revised.R")
 plas_sims <- PlasmodeContNew(formulaOut = as.formula(outForm), objectOut = NULL,
                              formulaExp = as.formula(expForm), objectExp = NULL,
                              data = plas, idVar = "id", 

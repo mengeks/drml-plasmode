@@ -38,7 +38,7 @@ Nsets <- 10000
 Nsamp <- 3000
 Effect_Size <- 6.6
 
-draw_sims <- function(){
+draw_sims <- function(i){
   require(tidyverse)
   
   C1 <- rnorm(Nsamp, 0, 1)
@@ -56,7 +56,7 @@ draw_sims <- function(){
 }
 
 sim_boots <- foreach(i = 1:Nsets) %dopar% {
-  draw_sims()
+  draw_sims(i)
 }
 
 sim_boots2 <- sim_boots[1:1000]

@@ -397,8 +397,9 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
 #########################################
 ## TEST BY LOOPING THROUGH SIMULATIONS
 library(tidyverse)
-
 plas <- readxl::read_xlsx("sim_data.xlsx") %>% as.data.frame(.)
+
+#plas <- readxl::read_excel("sim_data.xlsx")
 
 objectOut <- glm(formula = Y5 ~ A1 + L0.a + L0.d + L0.e + L1.a, family = gaussian, data = plas)
 objectExp <- glm(formula = A1 ~ L0.a + L0.d + L0.e + L1.a, family = binomial, data = plas)
