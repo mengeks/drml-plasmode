@@ -1,3 +1,22 @@
+# plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=T)
+# plas.formula <- make.formula("Y5", "A1", ver=data.ver)
+# outForm <- plas.formula$outForm
+# expForm <- plas.formula$expForm
+# formulaOut = as.formula(outForm)
+# objectOut = NULL
+# formulaExp = as.formula(expForm)
+# objectExp = NULL
+# data = plas
+# idVar = "id"
+# effectOR = Effect_Size
+# MMOut = 1
+# MMExp = 1
+# nsim = plas_sim_N
+# size = nrow(plas)
+# exposedPrev = NULL
+
+
+
 
 PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,objectExp=NULL, data, idVar,
                               effectOR =1, MMOut=1,MMExp=1, nsim, size, eventRate=NULL, exposedPrev=NULL,
@@ -29,14 +48,15 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     
     # Adjusting the exposure prevalence in base cohort
     if(is.null(exposedPrev)) exposedPrev <- mean(modExp$y)
-    bnewExp<- c(coef(modExp)[1], MMExp*coef(modExp)[-1])
-    XbnewExp<- as.vector(XEXP%*%bnewExp)
-    fnExp<- function(d)mean(plogis(d+XbnewExp))-exposedPrev
-    deltaExp <- uniroot(fnExp, lower=-20, upper=20)$root
-    Probexp <- plogis(deltaExp+XbnewExp)
-    # resample new exposure measures
-    x[exposure] <- rbinom(size,1,Probexp)
-    rm(modExp, XEXP)
+    # bnewExp<- c(coef(modExp)[1], MMExp*coef(modExp)[-1])
+    # XbnewExp<- as.vector(XEXP%*%bnewExp)
+    # fnExp<- function(d)mean(plogis(d+XbnewExp))-exposedPrev
+    # deltaExp <- uniroot(fnExp, lower=-20, upper=20)$root
+    # Probexp <- plogis(deltaExp+XbnewExp)
+    # # resample new exposure measures
+    # # set.seed(1)
+    # x[exposure] <- rbinom(size,1,Probexp)
+    # rm(modExp, XEXP)
     
     # Compute outcome model, using new exposures
     modOutCont <- glm2(formulaOut, family = "gaussian", x, control=glm.control(trace=F)) ## outcome model coefficients
@@ -65,7 +85,6 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     }
     ARR<-mean(RR)
     ARD<-mean(RD)
-    
     names(ids) <- paste("ID", 1:nsim, sep = "")
     names(ynew) <- paste("OUTCOME", 1:nsim, sep = "")
     names(expnew)<-paste("EXPOSURE",1:nsim, sep = "")
@@ -395,113 +414,115 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
 #########################################
 #########################################
 #########################################
-## TEST BY LOOPING THROUGH SIMULATIONS
-library(tidyverse)
-plas <- readxl::read_xlsx("sim_data.xlsx") %>% as.data.frame(.)
-
-#plas <- readxl::read_excel("sim_data.xlsx")
-
-objectOut <- glm(formula = Y5 ~ A1 + L0.a + L0.d + L0.e + L1.a, family = gaussian, data = plas)
-objectExp <- glm(formula = A1 ~ L0.a + L0.d + L0.e + L1.a, family = binomial, data = plas)
-formulaOut <- as.formula("Y5 ~ A1 + L0.a + L0.d + L0.e + L1.a")
-formulaExp <- as.formula("A1 ~ L0.a + L0.d + L0.e + L1.a")
-
-{
-  # Generate sims for all scenarios
-  Effect_Size = 6.6
-  N_sims = 500
-  set.seed(12345)
-  print("form_out_exp")
-  form_out_exp <- PlasmodeContNew(formulaOut = formulaOut, formulaExp = formulaExp, 
-                              data = plas, idVar = "id", 
-                              MMExp = 1, MMOut = 1,
-                              effectOR = Effect_Size, nsim = N_sims, 
-                             size = nrow(plas))
-  print("form_out")
-  form_out <- PlasmodeContNew(formulaOut = formulaOut, formulaExp = NULL, 
-                           data = plas, idVar = "id", 
-                           MMExp = 1, MMOut = 1,
-                           effectOR = Effect_Size, nsim = N_sims, 
-                           size = nrow(plas))
-  print("form_exp")
-  form_exp <- PlasmodeContNew(formulaOut = NULL, formulaExp = formulaExp, 
-                              data = plas, idVar = "id", 
-                              MMExp = 1, MMOut = 1,
-                              effectOR = Effect_Size, nsim = N_sims, 
-                              size = nrow(plas), outVar = "Y5")
-  print("obj_out_exp")
-  obj_out_exp <- PlasmodeContNew(objectOut = objectOut, objectExp = objectExp, 
-                              data = NULL, idVar = "id", 
-                              MMExp = 1, MMOut = 1,
-                              effectOR = Effect_Size, nsim = N_sims, 
-                              size = nrow(plas))
-  print("obj_out")
-  obj_out <- PlasmodeContNew(objectOut = objectOut, objectExp = NULL, 
-                                 data = NULL, idVar = "id", 
-                                 MMExp = 1, MMOut = 1,
-                                 effectOR = Effect_Size, nsim = N_sims, 
-                                 size = nrow(plas))
-  print("obj_exp")
-  obj_exp <- PlasmodeContNew(objectOut = NULL, objectExp = objectExp, 
-                             data = NULL, idVar = "id", 
-                             MMExp = 1, MMOut = 1,
-                             effectOR = Effect_Size, nsim = N_sims, 
-                             size = nrow(plas), outVar = "Y5")
-}
-
-
-# estimate ate, se, bias, mse, coverage for each type
-sim_names <- c("form_out_exp", "form_out", "form_exp", "obj_out_exp", "obj_out", "obj_exp")  
-sim_res <- NULL  
-
-for(t in 1:length(sim_names)){
-  print(sim_names[t])
-  sdf <- NULL
-  sims1 <- eval(as.name(sim_names[t]))
-  for(i in 1:N_sims){
-    stmp <- cbind(id = sims1$Sim_Data[i],
-                  A1 = sims1$Sim_Data[i + 2*N_sims],
-                  Y5 = sims1$Sim_Data[i + N_sims])
-    colnames(stmp) <- c("id", "A1", "Y5")
-    suppressMessages(stmp <- left_join(as_tibble(stmp), dplyr::select(plas, -Y5, -A1)))
-    if(i%%50 == 0){print(paste0("Estimating set: ", i, " (out of ", N_sims, ")"))}
-    pn <- summary(glm(data = stmp, formula = A1 ~ 1, family = "gaussian"))$coefficient[1,1]
-    if(sim_names[t] %in% c("form_out_exp", "form_exp")){pd <- glm(data = stmp, formula = formulaExp, family = "binomial")}
-    if(sim_names[t] %in% c("obj_out_exp", "obj_exp")){pd <- glm(data = stmp, formula = objectExp$formula, family = "binomial")}
-    stmp <- stmp %>% add_column(pd = pd$fitted.values) %>%
-      mutate(wt0 = 1, # unweighted
-             wt1 = if_else(A1 == 1, pn/pd, (1-pn)/(1-pd))) %>% # Stabilized IPTW
-      mutate(wt2 = case_when(wt1 > quantile(wt1, 0.95) ~ quantile(wt1, 0.95),
-                             wt1 < quantile(wt1, 0.05) ~ quantile(wt1, 0.05),
-                             T ~ wt1)) # Truncated IPTW
-    if(sim_names[t] %in% c("obj_exp", "form_exp")){sres <- stmp %>% glm(formula = Y5 ~ A1, family = "gaussian", weight = wt2) %>% summary()}
-    if(sim_names[t] %in% c("obj_out_exp")){sres <- stmp %>% glm(formula = objectOut$formula, family = "gaussian", weight = wt2) %>% summary()}
-    if(sim_names[t] %in% c("obj_out")){sres <- stmp %>% glm(formula = objectOut$formula, family = "gaussian", weight = wt0) %>% summary()}
-    if(sim_names[t] %in% c("form_out_exp")){sres <- stmp %>% glm(formula = formulaOut, family = "gaussian", weight = wt2) %>% summary()}
-    if(sim_names[t] %in% c("form_out")){sres <- stmp %>% glm(formula = formulaOut, family = "gaussian", weight = wt0) %>% summary()}
-    BETA <- sres$coefficients[2,1]
-    SE <- sres$coefficients[2,2]
-    I <- i
-    sdf <- rbind(sdf, cbind(BETA, SE, I))
-  }
-  sdf <- as_tibble(sdf) %>% mutate(BETA = BETA, SE = SE,
-                                   LL = BETA - 1.96*SE, UL = BETA + 1.96*SE,
-                                   mu = mean(BETA), bias = as.double(BETA) - Effect_Size)
-  
-  # pt <- sdf %>% ggplot() + geom_errorbar(aes(x = I, ymin = LL, ymax = UL)) + 
-  #   geom_hline(aes(yintercept = mu), linetype = "dashed") + 
-  #   geom_hline(aes(yintercept = Effect_Size), linetype = "solid")
-  # plot(pt)
-  # sdf %>% summarize(mu_ATE = mean(BETA), med_ATE = median(BETA),
-  #                   mu_SE = mean(SE), med_SE = median(SE),
-  #                   mu_bias = mean(bias), med_bias = median(bias),
-  #                   var = var(BETA), MSE = var + mu_bias^2,
-  #                   coverage = sum((LL <= Effect_Size & UL >= Effect_Size)/N_sims))
-  
-  res <- sdf %>% summarize(mu_ATE = mean(BETA), mu_SE = mean(SE), 
-                    mu_bias = mean(bias), MSE = var(BETA) + mu_bias^2,
-                    coverage = sum((LL <= Effect_Size & UL >= Effect_Size)/N_sims)) %>% as.numeric()
-  sim_res <- rbind(sim_res, res)
-}
-colnames(sim_res) <- c("BETA", "SE", "BIAS", "MSE", "COVERAGE")
-as_tibble(sim_res) %>% add_column(sim_names)
+# ## TEST BY LOOPING THROUGH SIMULATIONS
+# library(tidyverse)
+# plas <- readxl::read_xlsx("sim_data.xlsx") %>% as.data.frame(.)
+# mean(plas[which(plas$A1==1),]$Y5) - mean(plas[which(plas$A1==0),]$Y5)
+# #plas <- readxl::read_excel("sim_data.xlsx")
+# 
+# objectOut <- glm(formula = Y5 ~ A1 + L0.a + L0.d + L0.e + L1.a, family = gaussian, data = plas)
+# objectExp <- glm(formula = A1 ~ L0.a + L0.d + L0.e + L1.a, family = binomial, data = plas)
+# formulaOut <- as.formula("Y5 ~ A1 + L0.a + L0.d + L0.e + L1.a")
+# formulaExp <- as.formula("A1 ~ L0.a + L0.d + L0.e + L1.a")
+# 
+# {
+#   # Generate sims for all scenarios
+#   Effect_Size = 6.6
+#   N_sims = 500
+#   set.seed(12345)
+#   print("form_out_exp")
+#   form_out_exp <- PlasmodeContNew(formulaOut = formulaOut, formulaExp = formulaExp,
+#                               data = plas, idVar = "id",
+#                               MMExp = 1, MMOut = 1,
+#                               effectOR = Effect_Size, nsim = N_sims,
+#                              size = nrow(plas))
+#   print("form_out")
+#   form_out <- PlasmodeContNew(formulaOut = formulaOut, formulaExp = NULL,
+#                            data = plas, idVar = "id",
+#                            MMExp = 1, MMOut = 1,
+#                            effectOR = Effect_Size, nsim = N_sims,
+#                            size = nrow(plas))
+#   print("form_exp")
+#   form_exp <- PlasmodeContNew(formulaOut = NULL, formulaExp = formulaExp,
+#                               data = plas, idVar = "id",
+#                               MMExp = 1, MMOut = 1,
+#                               effectOR = Effect_Size, nsim = N_sims,
+#                               size = nrow(plas), outVar = "Y5")
+#   print("obj_out_exp")
+#   obj_out_exp <- PlasmodeContNew(objectOut = objectOut, objectExp = objectExp,
+#                               data = NULL, idVar = "id",
+#                               MMExp = 1, MMOut = 1,
+#                               effectOR = Effect_Size, nsim = N_sims,
+#                               size = nrow(plas))
+#   print("obj_out")
+#   obj_out <- PlasmodeContNew(objectOut = objectOut, objectExp = NULL,
+#                                  data = NULL, idVar = "id",
+#                                  MMExp = 1, MMOut = 1,
+#                                  effectOR = Effect_Size, nsim = N_sims,
+#                                  size = nrow(plas))
+#   print("obj_exp")
+#   obj_exp <- PlasmodeContNew(objectOut = NULL, objectExp = objectExp,
+#                              data = NULL, idVar = "id",
+#                              MMExp = 1, MMOut = 1,
+#                              effectOR = Effect_Size, nsim = N_sims,
+#                              size = nrow(plas), outVar = "Y5")
+# }
+# 
+# 
+# # estimate ate, se, bias, mse, coverage for each type
+# sim_names <- c("form_out_exp", "form_out", "form_exp", "obj_out_exp", "obj_out", "obj_exp")
+# sim_res <- NULL
+# 
+# 
+# for(t in 1:length(sim_names)){
+#   print(sim_names[t])
+#   sdf <- NULL
+#   sims1 <- eval(as.name(sim_names[t]))
+#   for(i in 1:N_sims){
+#     stmp <- cbind(id = sims1$Sim_Data[i],
+#                   A1 = sims1$Sim_Data[i + 2*N_sims],
+#                   Y5 = sims1$Sim_Data[i + N_sims])
+#     colnames(stmp) <- c("id", "A1", "Y5")
+#     suppressMessages(stmp <- left_join(as_tibble(stmp), dplyr::select(plas, -Y5, -A1)))
+#     # mean(stmp[which(stmp$A1==1),]$Y5) - mean(stmp[which(stmp$A1==0),]$Y5)
+#     if(i%%50 == 0){print(paste0("Estimating set: ", i, " (out of ", N_sims, ")"))}
+#     pn <- summary(glm(data = stmp, formula = A1 ~ 1, family = "gaussian"))$coefficient[1,1]
+#     if(sim_names[t] %in% c("form_out_exp", "form_exp")){pd <- glm(data = stmp, formula = formulaExp, family = "binomial")}
+#     if(sim_names[t] %in% c("obj_out_exp", "obj_exp")){pd <- glm(data = stmp, formula = objectExp$formula, family = "binomial")}
+#     stmp <- stmp %>% add_column(pd = pd$fitted.values) %>%
+#       mutate(wt0 = 1, # unweighted
+#              wt1 = if_else(A1 == 1, pn/pd, (1-pn)/(1-pd))) %>% # Stabilized IPTW
+#       mutate(wt2 = case_when(wt1 > quantile(wt1, 0.95) ~ quantile(wt1, 0.95),
+#                              wt1 < quantile(wt1, 0.05) ~ quantile(wt1, 0.05),
+#                              T ~ wt1)) # Truncated IPTW
+#     if(sim_names[t] %in% c("obj_exp", "form_exp")){sres <- stmp %>% glm(formula = Y5 ~ A1, family = "gaussian", weight = wt2) %>% summary()}
+#     if(sim_names[t] %in% c("obj_out_exp")){sres <- stmp %>% glm(formula = objectOut$formula, family = "gaussian", weight = wt2) %>% summary()}
+#     if(sim_names[t] %in% c("obj_out")){sres <- stmp %>% glm(formula = objectOut$formula, family = "gaussian", weight = wt0) %>% summary()}
+#     if(sim_names[t] %in% c("form_out_exp")){sres <- stmp %>% glm(formula = formulaOut, family = "gaussian", weight = wt2) %>% summary()}
+#     if(sim_names[t] %in% c("form_out")){sres <- stmp %>% glm(formula = formulaOut, family = "gaussian", weight = wt0) %>% summary()}
+#     BETA <- sres$coefficients[2,1]
+#     SE <- sres$coefficients[2,2]
+#     I <- i
+#     sdf <- rbind(sdf, cbind(BETA, SE, I))
+#   }
+#   sdf <- as_tibble(sdf) %>% mutate(BETA = BETA, SE = SE,
+#                                    LL = BETA - 1.96*SE, UL = BETA + 1.96*SE,
+#                                    mu = mean(BETA), bias = as.double(BETA) - Effect_Size)
+# 
+#   # pt <- sdf %>% ggplot() + geom_errorbar(aes(x = I, ymin = LL, ymax = UL)) +
+#   #   geom_hline(aes(yintercept = mu), linetype = "dashed") +
+#   #   geom_hline(aes(yintercept = Effect_Size), linetype = "solid")
+#   # plot(pt)
+#   # sdf %>% summarize(mu_ATE = mean(BETA), med_ATE = median(BETA),
+#   #                   mu_SE = mean(SE), med_SE = median(SE),
+#   #                   mu_bias = mean(bias), med_bias = median(bias),
+#   #                   var = var(BETA), MSE = var + mu_bias^2,
+#   #                   coverage = sum((LL <= Effect_Size & UL >= Effect_Size)/N_sims))
+# 
+#   res <- sdf %>% summarize(mu_ATE = mean(BETA), mu_SE = mean(SE),
+#                     mu_bias = mean(bias), MSE = var(BETA) + mu_bias^2,
+#                     coverage = sum((LL <= Effect_Size & UL >= Effect_Size)/N_sims)) %>% as.numeric()
+#   sim_res <- rbind(sim_res, res)
+# }
+# colnames(sim_res) <- c("BETA", "SE", "BIAS", "MSE", "COVERAGE")
+# as_tibble(sim_res) %>% add_column(sim_names)
