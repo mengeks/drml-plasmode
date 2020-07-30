@@ -31,7 +31,7 @@ library(randomForest)
 setwd("~/Desktop/HuangGroup/cvtmle_plasmode/Code")
 set.seed(42782)
 options(tibble.print_max = 40, tibble.print_min = 30)
-registerDoParallel(cores = detectCores(all.tests = T) - 1)
+registerDoParallel(cores=detectCores(all.tests = T)-2)
 
 # out_path <- "D:/SICS/Projects/TMLE_Plasmode/"
 # data_path <- "D:/SICS/Data and Instruments/Archive/"
@@ -39,20 +39,9 @@ registerDoParallel(cores = detectCores(all.tests = T) - 1)
 ##########################################
 # Plasmode simulation
 ##########################################
-# org_data <- read_dta(paste0(data_path,"merged_MI.dta")) %>% filter(visit == 0) 
-# vars <- c(names(org_data)[12:21], names(org_data)[26:41], names(org_data)[61:83], names(org_data)[140:421])
-# org_data_imp <- org_data %>% mutate(A1 = as.double(ppBMI > 27)) %>% select(Y5 = bmi, A1, vars) %>% 
-#   mutate_if(is.character, as.factor) %>% mutate_all(list(~as.double(.))) %>%
-#   mutate_all(list(~if_else(is.na(.), mean(., na.rm = T), .)))  
-# plas <- org_data_imp %>% add_column(id = c(1:nrow(org_data_imp))) %>% mutate(id = paste0("ID",id)) %>% data.frame(.)
-# varnames <- paste0(rep("VAR_", length(vars)), as.character(seq(1,length(vars)), 1))
-# plas %>% rename_at(vars(vars), ~varnames) %>% write_dta(., paste0(out_path,"plas_data.dta"))
-
-# out_path <- "~/Desktop/HuangGroup/cvtmle_plasmode/Data/"
-
-
 ### Outcome and exposure with high-dim covars (N = 331 covars)
-# outForm <- "Y5 ~ A1" CHANGE
+
+# Generate formula for low dim and high-dim, Y5/A1 and Y/A
 make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL"){
   if (ver == "FULL"){
     outForm <- paste0(outVar," ~ ",expVar)
@@ -73,8 +62,13 @@ make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL"){
               plas=plas))
 }
 
-
+# Generate dataset. 
+# Options: ver: high-dim vs low-dim
+#         size, use.subset: N=1178 vs N < 1178; 
 make.set <- function(ver = "FULL", size = 200, plas,use.subset){
+  if (size < 1178) {
+    use.subset = T
+  }
   if (ver == "FULL"){
     plas <- data.frame(plas)
   }
@@ -106,10 +100,9 @@ plas_org <- haven::read_dta(paste0(out_path,"plas_data.dta"))
 vars <- names(plas_org[3:333])
 # data.ver <- "FULL"
 data.ver <- "13"
-size <- 1178
-#size <-200
+# size <- 1178
+size <-200
 
-# set.seed(2134)
 rm(.Random.seed, envir=.GlobalEnv)
 plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=F)
 plas.formula <- make.formula("Y5", "A1", ver=data.ver)
@@ -119,7 +112,6 @@ expForm <- plas.formula$expForm
 
 plas_sim_N <- 1000
 Effect_Size <- 6.6 # simulated risk difference = large change (e.g. absolute units)
-#Effect_Size <- 0.66 # simulated risk difference = 2/3 SD higher BMI
 source("20200226-PlasmodeCont_Revised.R")
 set.seed(2222)
 plas_sims <- PlasmodeContNew(formulaOut = as.formula(outForm), objectOut = NULL,
@@ -134,7 +126,9 @@ plas_sims <- PlasmodeContNew(formulaOut = as.formula(outForm), objectOut = NULL,
 
 
 #meta_res <- NULL # intialize the results table
+# DC implementation
 source("20200705-DCDR-Functions.R")
+# getRES function is now relocated to a separate file (20200720-Algos-code.R)
 source("20200720-Algos-code.R")
 
 ##################################
@@ -174,20 +168,20 @@ source("20200720-Algos-code.R")
 {
 set.seed(42782)
 tic()
-N_sims <- 200# this should <= plas_sim_N
+N_sims <- 500# this should <= plas_sim_N
 
 # regression models for GLM / AIPW
 reg.formulas <- make.formula("Y", "A",ver = data.ver)
 expForm <- reg.formulas$expForm
 outForm <- reg.formulas$outForm
 
-# # specify which set of learners for SL
+# specify which set of learners for SL
 # ### NON-SMOOTH
 # short_tmle_lib <- SL_param_list
 # tmle_lib <- lrnr_SL
 # aipw_lib <- SL.lib
 
-#### SMOOTH
+### SMOOTH
 short_tmle_lib <- SL_list
 tmle_lib <- lrnr_SL_param
 aipw_lib <- SL.param
@@ -200,33 +194,50 @@ boot1 <- foreach(i = 1:N_sims) %dopar% {
   require(SuperLearner)
 
   # Initialize dataset
-  # i<-1
+  # i<-1 # DEBUG
   plas_data <- cbind(id = plas_sims$Sim_Data[i],
                      A = plas_sims$Sim_Data[i + (2*plas_sim_N)],
                      Y = plas_sims$Sim_Data[i + plas_sim_N])
   colnames(plas_data) <- c("id", "A", "Y")
   set1 <- suppressMessages(left_join(as_tibble(plas_data), as_tibble(plas))) #dplyr::select(as_tibble(plas), -Y5, -A1))) # add covariates
-  # mean(set1[which(set1$A==1),]$Y) - mean(set1[which(set1$A==0),]$Y)
-  #mean(set1[which(set1$A1==1),]$Y) - mean(set1[which(set1$A1==0),]$Y)
+  # mean(set1[which(set1$A==1),]$Y) - mean(set1[which(set1$A==0),]$Y) # DEBUG
+  #mean(set1[which(set1$A1==1),]$Y) - mean(set1[which(set1$A1==0),]$Y) # DEBUG
   tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y)))
-  # set1 <- set1[1:N_samp, ]
-  # tset <- tset[1:N_samp, ]
+  
+  # # Debug the propensity score
+  # gset<-set1
+  # num <- summary(glm(data = gset, formula = A ~ 1, family = "gaussian"))$coefficient[1,1]
+  # denom_fit <- glm(data = gset,
+  #                  formula = as.formula(expForm),
+  #                  family = "binomial")
+  # gset <- gset %>% add_column(denom = denom_fit$fitted.values) %>%
+  #   mutate(wt = if_else(A == 1, num/denom, (1-num)/(1-denom))) #Stabilized IPTW
+  # gset <- gset %>% mutate(wt2 = case_when(wt > quantile(gset$wt, 0.95) ~ quantile(gset$wt, 0.95),
+  #                                         wt < quantile(gset$wt, 0.05) ~ quantile(gset$wt, 0.05),
+  #                                         T ~ wt)) # Truncated IPTW
+  # # mean(gset$Y[gset$A==1])
+  # mean(gset$wt2)
+  # # # mean(gset$Y[gset$A==1])- mean(gset$Y[gset$A==0])
   
   getRES(set1, tset, aipw_lib, tmle_lib, short_tmle_lib,
          doAIPW=0, doDCAIPW=0,
-         doIPW = 1, 
+         doIPW = 1,
          doTMLE=0, doManuTMLE=0, doShortTMLE = 0,
-         doDCTMLE=0
+         doDCTMLE=0,
+         num_cf=5,
+         #control=list()
+         control=SuperLearner.CV.control(V=2)
          )
 }
 toc()
 }
 
-#meta_res_bk <- meta_res
+
+# meta_res_bk <- meta_res
 #meta_res_bk <- NULL
 
 ##################################
-## SUMMARIZE AND VISUALIZE
+## SUMMARIZE
 ##################################
 {
 tmp <- NULL
@@ -258,53 +269,56 @@ sim_res
 }
 
 
-
-
-
+##################################
+## VISUALIZE
+##################################
 
 {
 pos <- max(sim_corr1$ub)  
 sim_plot <- sim_corr1 %>% 
-  ggplot(aes(x = iter/2, y = ATE, color = TYPE)) +
+  ggplot(aes(x = iter, y = ATE, color = TYPE)) +
   geom_point() + geom_errorbar(aes(ymin = lb, ymax = ub)) + 
   geom_hline(aes(yintercept = Effect_Size)) + 
   # geom_hline(data = filter(sim_corr1, substring(TYPE,1,3) %in% c("AIP", "GLM")), aes(yintercept = mean(ATE)), linetype = "dashed") +
-  geom_hline(data = filter(sim_corr1, substring(TYPE,1,2) == "CV"), aes(yintercept = mean(ATE)), linetype = "dotted") +
+  # geom_hline(data = filter(sim_corr1, substring(TYPE,1,2) == "CV"), aes(yintercept = mean(ATE)), linetype = "dotted") +
+  geom_hline(data = sim_corr1, aes(yintercept = mean(ATE)), linetype = "dotted") +
   # geom_text(data = filter(sim_corr1, substring(TYPE,1,3) %in% c("AIP", "GLM")),
   #           aes(N_sims, pos, hjust = "right",
   #               label = paste("\n\nMean bias = ", as.character(round(mean(bias), 3)),
   #                             "\nMedian bias = ", as.character(round(median(bias), 3)),
   #                             "\nMSE = ", as.character(round(var(ATE) + mean(bias)^2, 3)),
   #                             "\nCoverage = ", as.character(round(sum(lb <= Effect_Size & ub >= Effect_Size)/N_sims, 3)) ))) +
-  geom_text(data = filter(sim_corr1, substring(TYPE,1,2) == "CV"),
-            aes(N_sims, pos, hjust = "right",
-                label = paste("\n\nMean bias = ", as.character(round(mean(bias), 3)),
-                              "\nMedian bias = ", as.character(round(median(bias), 3)),
-                              "\nMSE = ", as.character(round(var(ATE) + mean(bias)^2, 3)),
-                              "\nCoverage = ", as.character(round(sum(lb <= Effect_Size & ub >= Effect_Size)/N_sims, 3)) ))) +
+  # geom_text(data = filter(sim_corr1, substring(TYPE,1,2) == "CV"),
+  #           aes(N_sims, pos, hjust = "right",
+  #               label = paste("\n\nMean bias = ", as.character(round(mean(bias), 3)),
+  #                             "\nMedian bias = ", as.character(round(median(bias), 3)),
+  #                             "\nMSE = ", as.character(round(var(ATE) + mean(bias)^2, 3)),
+  #                             "\nCoverage = ", as.character(round(sum(lb <= Effect_Size & ub >= Effect_Size)/N_sims, 3)) ))) +
   labs(x = "iteration", color = "Estimator") +
   facet_wrap(~TYPE) +
   theme(legend.position = "none")
 sim_plot
-
-# append results
-meta_res_bk <- rbind(meta_res_bk, 
-                  cbind(N = nrow(plas), iter = N_sims, 
-                        A_mu_ATE = sim_res$mu_ATE[1], A_med_ATE = sim_res$med_ATE[1],
-                        A_mu_SE = sim_res$mu_SE[1], A_med_SE = sim_res$med_ATE[1],
-                        A_mu_bias = sim_res$mu_bias[1], A_med_bias = sim_res$med_bias[1],
-                        A_MSE = sim_res$MSE[1], A_coverage = sim_res$coverage[1],
-                        T_mu_ATE = sim_res$mu_ATE[2], T_med_ATE = sim_res$med_ATE[2],
-                        T_mu_SE = sim_res$mu_SE[2], T_med_SE = sim_res$med_ATE[2],
-                        T_mu_bias = sim_res$mu_bias[2], T_med_bias = sim_res$med_bias[2],
-                        T_MSE = sim_res$MSE[2], T_coverage = sim_res$coverage[2],
-                        aipw_lib = toString(aipw_lib), tmle_lib = tmle_lib$name))
 }
+
+# {
+# # append results
+# meta_res_bk <- rbind(meta_res_bk, 
+#                   cbind(N = nrow(plas), iter = N_sims, 
+#                         A_mu_ATE = sim_res$mu_ATE[1], A_med_ATE = sim_res$med_ATE[1],
+#                         A_mu_SE = sim_res$mu_SE[1], A_med_SE = sim_res$med_ATE[1],
+#                         A_mu_bias = sim_res$mu_bias[1], A_med_bias = sim_res$med_bias[1],
+#                         A_MSE = sim_res$MSE[1], A_coverage = sim_res$coverage[1],
+#                         T_mu_ATE = sim_res$mu_ATE[2], T_med_ATE = sim_res$med_ATE[2],
+#                         T_mu_SE = sim_res$mu_SE[2], T_med_SE = sim_res$med_ATE[2],
+#                         T_mu_bias = sim_res$mu_bias[2], T_med_bias = sim_res$med_bias[2],
+#                         T_MSE = sim_res$MSE[2], T_coverage = sim_res$coverage[2],
+#                         aipw_lib = toString(aipw_lib), tmle_lib = tmle_lib$name))
+# }
 
 #writexl::write_xlsx(data.frame(meta_res), paste0(out_path,"sim_results_v1.xlsx"))
 
-writeClipboard(meta_res_bk[15,])
-writeClipboard(meta_res_bk[2,])
+# writeClipboard(meta_res_bk[15,])
+# writeClipboard(meta_res_bk[2,])
 
 # example_plasmode <- set1
 # writexl::write_xlsx(example_plasmode, paste0(out_path, "plasmode_data_200.xlsx"))
@@ -321,32 +335,30 @@ writeClipboard(meta_res_bk[2,])
 
 
 
-
-
 ##################################
 ##################################
-## diagnostic for SL-estimated PS
-set1 <- set1 %>% add_column(tmle_ps = model_tmle$cum.g[,,1], tmle_ps_untrunc = model_tmle$cum.g.unbounded[,,1])
-ggplot(data = set1) + 
-  geom_histogram(aes(x = denom, 
-  #geom_histogram(aes(x = tmle_ps_untrunc, 
-                     fill = as.factor(A1)), alpha = 0.4, position = "dodge", binwidth = 0.05) +
-  labs(title = "Propensity scores estimated by SL (TMLE), by treatment status",
-       fill = "A1" ) + scale_x_continuous(breaks = seq(0,10,0.1)) +
-  theme(legend.position = c(0.1,0.9), legend.background = element_blank())
-
-set1 %>% group_by(A1) %>% summarize(N = n(), min(tmle_ps), mean(tmle_ps), max(tmle_ps))
-set1 %>% group_by(A1) %>% summarize(N = n(), min(denom), mean(denom), max(denom))
-set1 %>% group_by(A1) %>% summarize(N = n(), min(wt), mean(wt), max(wt))
-
-# use % truncated as a measure of overfit (?)
-set1 %>% group_by(A1) %>% 
-  summarize(sum(tmle_ps == 0.1), mean(tmle_ps == 0.1),
-            sum(tmle_ps == 0.9), mean(tmle_ps == 0.9)) 
-
-set1 %>% dplyr::select(A1, tmle_ps_untrunc, denom) %>% gather(model, val, -A1) %>% 
-ggplot() + geom_density(aes(val, fill = factor(A1)), alpha = 0.4) +
-  labs(title = "Propensity scores estimated by SL (TMLE, truncated at 0.9), by treatment status",
-       fill = "A1" ) + scale_x_continuous(breaks = seq(0,10,0.1)) +
-  theme(legend.position = c(0.1,0.9), legend.background = element_blank()) +
-  facet_wrap(~model)
+# ## diagnostic for SL-estimated PS
+# set1 <- set1 %>% add_column(tmle_ps = model_tmle$cum.g[,,1], tmle_ps_untrunc = model_tmle$cum.g.unbounded[,,1])
+# ggplot(data = set1) + 
+#   geom_histogram(aes(x = denom, 
+#   #geom_histogram(aes(x = tmle_ps_untrunc, 
+#                      fill = as.factor(A1)), alpha = 0.4, position = "dodge", binwidth = 0.05) +
+#   labs(title = "Propensity scores estimated by SL (TMLE), by treatment status",
+#        fill = "A1" ) + scale_x_continuous(breaks = seq(0,10,0.1)) +
+#   theme(legend.position = c(0.1,0.9), legend.background = element_blank())
+# 
+# set1 %>% group_by(A1) %>% summarize(N = n(), min(tmle_ps), mean(tmle_ps), max(tmle_ps))
+# set1 %>% group_by(A1) %>% summarize(N = n(), min(denom), mean(denom), max(denom))
+# set1 %>% group_by(A1) %>% summarize(N = n(), min(wt), mean(wt), max(wt))
+# 
+# # use % truncated as a measure of overfit (?)
+# set1 %>% group_by(A1) %>% 
+#   summarize(sum(tmle_ps == 0.1), mean(tmle_ps == 0.1),
+#             sum(tmle_ps == 0.9), mean(tmle_ps == 0.9)) 
+# 
+# set1 %>% dplyr::select(A1, tmle_ps_untrunc, denom) %>% gather(model, val, -A1) %>% 
+# ggplot() + geom_density(aes(val, fill = factor(A1)), alpha = 0.4) +
+#   labs(title = "Propensity scores estimated by SL (TMLE, truncated at 0.9), by treatment status",
+#        fill = "A1" ) + scale_x_continuous(breaks = seq(0,10,0.1)) +
+#   theme(legend.position = c(0.1,0.9), legend.background = element_blank()) +
+#   facet_wrap(~model)

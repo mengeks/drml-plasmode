@@ -10,7 +10,9 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                    doAIPW =0, doDCAIPW=0,
                    doIPW = 0,
                    doTMLE = 0, doManuTMLE=0, doShortTMLE = 0,
-                   doDCTMLE=0){
+                   doDCTMLE=0,
+                   num_cf=5,
+                   control){
   res <- NULL
   
   # AIPW
@@ -74,9 +76,8 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                             covarsT=all.vars(as.formula(expForm))[-1],
                             covarsO=all.vars(as.formula(outForm))[-1],
                             learners=aipw_lib,
-                            #control=SuperLearner.CV.control(V=5), 
-                            control=list(),
-                            num_cf=10)
+                            control=control, 
+                            num_cf=num_cf)
     
     ATE <- DCAIPW$rd
     SE <- DCAIPW$mvd
@@ -152,7 +153,7 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                  covarsT=all.vars(as.formula(expForm))[-1],
                  covarsO=all.vars(as.formula(outForm))[-1],
                  learners=aipw_lib,
-                 control=SuperLearner.CV.control(V=5))
+                 control=control)
     
     ATE <- TMLE$rd
     SE <- sqrt(TMLE$vd)
@@ -168,7 +169,7 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                               covarsT=all.vars(as.formula(expForm))[-1],
                               covarsO=all.vars(as.formula(outForm))[-1],
                               learners=aipw_lib,
-                              control=SuperLearner.CV.control(V=5), num_cf=10)
+                              control=control, num_cf=num_cf)
     
     ATE <- DCTMLE$rd
     SE <- sqrt(DCTMLE$mvd)

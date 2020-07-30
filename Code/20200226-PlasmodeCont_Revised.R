@@ -1,4 +1,5 @@
-# plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=T)
+# DEBUG. Initiate Within function variables
+# plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=F)
 # plas.formula <- make.formula("Y5", "A1", ver=data.ver)
 # outForm <- plas.formula$outForm
 # expForm <- plas.formula$expForm
@@ -14,7 +15,7 @@
 # nsim = plas_sim_N
 # size = nrow(plas)
 # exposedPrev = NULL
-
+# set.seed(1111) # tweak seeds here
 
 
 
@@ -48,7 +49,7 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     
     # Adjusting the exposure prevalence in base cohort
     if(is.null(exposedPrev)) exposedPrev <- mean(modExp$y)
-    # bnewExp<- c(coef(modExp)[1], MMExp*coef(modExp)[-1])
+    bnewExp<- c(coef(modExp)[1], MMExp*coef(modExp)[-1])
     # XbnewExp<- as.vector(XEXP%*%bnewExp)
     # fnExp<- function(d)mean(plogis(d+XbnewExp))-exposedPrev
     # deltaExp <- uniroot(fnExp, lower=-20, upper=20)$root
@@ -57,18 +58,21 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     # # set.seed(1)
     # x[exposure] <- rbinom(size,1,Probexp)
     # rm(modExp, XEXP)
-    
     # Compute outcome model, using new exposures
     modOutCont <- glm2(formulaOut, family = "gaussian", x, control=glm.control(trace=F)) ## outcome model coefficients
     X <- gam(formulaOut, x, family = "gaussian", fit = FALSE)$X ## extract outcome model matrix
     
     bnew <- c(coef(modOutCont)[1], MMOut*coef(modOutCont)[-1]) # find intercept value needed to get approximate mean outcome
     bnew <- replace(bnew, names(coef(modOutCont)) == exposure, effectOR) # "inject" desired RD (beta coeff)
-    Xbnew <- as.vector(X %*% bnew)+rnorm(nrow(data),0,var(residuals(modOutCont))) # generate new outcome measure with noise
-  
-    # draw bootstrap sets
+    EYnew <- as.vector(X %*% bnew)
+    Xbnew <- EYnew +rnorm(nrow(data),0,var(residuals(modOutCont))) # generate new outcome measure with noise
+    summary(Xbnew - EYnew) # DEBUG
+    mean(Xbnew[x[,exposure]==1]) - mean(Xbnew[x[,exposure]==0])
+    mean(EYnew[x[,exposure]==1]) - mean(EYnew[x[,exposure]==0])
+    # # draw bootstrap sets
     ids <- ynew <- expnew <- data.frame(matrix(nrow = size, ncol = nsim)) # intialize replacement matrices 
     RR <- RD <- vector('numeric', length = nsim)
+    As <- vector('numeric', length = nsim)#DEBUG
     for(sim in 1:nsim) {
       if(sim == 1 | (sim %% (nsim/2)) == 0) print(paste0("Drawing sample: ", sim, " (of ", nsim, ") ..."))
       idxs <- sample(1:n, size, replace = TRUE) # resample from all rows, with replacement
@@ -82,9 +86,12 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
       p_0<- as.vector(datasim %*% bnew)
       RR[sim]<-mean(p_1)/mean(p_0)
       RD[sim]<-mean(p_1)-mean(p_0)
+      As[sim] <- mean(expnew[,sim])#DEBUG
     }
     ARR<-mean(RR)
     ARD<-mean(RD)
+    # (avgAs <- mean(As)) #DEBUG
+    # hist(As) #DEBUG
     names(ids) <- paste("ID", 1:nsim, sep = "")
     names(ynew) <- paste("OUTCOME", 1:nsim, sep = "")
     names(expnew)<-paste("EXPOSURE",1:nsim, sep = "")
