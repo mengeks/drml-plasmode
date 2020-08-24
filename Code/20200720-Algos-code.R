@@ -2,6 +2,37 @@
 
 #expForm <- "A ~ L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
 #outForm <- "Y ~ A + L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
+##########################################
+# Initialize necessary parameters for estimator
+##########################################
+
+{
+  # TMLE parameters
+  #SL.lib <- c("SL.randomForest", "SL.xgboost", "SL.nnet", "SL.glm", "SL.glmnet", "SL.polymars")
+  #SL.lib <- list("SL.randomForest", "SL.xgboost", "SL.nnet", "SL.glm", c("SL.glmnet", "All"), c("SL.polymars", "All"))
+  SL.lib <- list("SL.randomForest", "SL.xgboost", "SL.glm", c("SL.polymars", "All"))
+  SL.lib.tmle <- c("SL.randomForest", "SL.xgboost", "SL.glm", "SL.polymars")
+  SL.param <- c("SL.glm", "SL.glmnet", "SL.polymars")
+  
+  # Specify the NP-SEM for the TMLE - including bounded, tranformed Y ("YT")
+  Zvars <- ifelse(data.ver=="FULL",
+                  vars,
+                  c("L0.a", "L0.b", "L0.c", "L0.d", "L0.e", "L0.f", "L0.g", "L0.h", "L0.i", "L0.j", "L0.k"))
+  npsem <- list(define_node("Z", Zvars),
+                #c("L0.a", "L0.b", "L0.c", "L0.d", "L0.e", "L0.f", "L0.g", "L0.h", "L0.i", "L0.j", "L0.k")),
+                define_node("A", c("A"), c("Z")),
+                define_node("Y", c("YT"), c("A", "Z")))
+  
+  # Specify the learners for CV-TMLE
+  lrnr_SL <- make_learner(Lrnr_pkg_SuperLearner, SL.lib.tmle)
+  lrnr_SL_param <- make_learner(Lrnr_pkg_SuperLearner, SL.param)
+  lrnr_glm <- make_learner(Lrnr_glm_fast)
+  lrnr_mean <- make_learner(Lrnr_mean)
+  
+  SL_list <- list(Y = lrnr_SL, A = lrnr_SL)
+  SL_param_list <- list(Y = lrnr_SL_param, A = lrnr_SL_param)
+  glm_list <- list(Y = lrnr_glm, A = lrnr_glm)
+}
 
 ###############################
 # FUNCTION TO RUN AIPW, CV-TMLE, and IPW+GLM

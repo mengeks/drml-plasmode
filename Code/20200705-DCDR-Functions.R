@@ -12,7 +12,7 @@
 # data <- tset # DEBUG
 # learners <- aipw_lib # DEBUG
 # (covarsT <- all.vars(as.formula(expForm))[-1]) # DEBUG
-# control <- SuperLearner.CV.control(V=5) # DEBUG
+# control <- SuperLearner.CV.control(V=2) # DEBUG
 # (covarsO <- all.vars(as.formula(outForm))[-1]) # DEBUG
 # outcome <- as.character(as.formula(outForm)[[2]]) # DEBUG
 # exposure <- as.character(as.formula(expForm)[[2]]) # DEBUG
@@ -335,7 +335,7 @@ DCTMLE_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, c
   vd <- (var(filter(data,s==1)$ifd_1) + var(filter(data,s==2)$ifd_2) + var(filter(data,s==3)$ifd_3)) / (3*nrow(data))
   v1 <- v1 * (max(data$Y)-min(data$Y))**2
   v0 <- v0 * (max(data$Y)-min(data$Y))**2
-  vd <- vd * (max(data$Y)-min(data$Y))**2
+  (vd <- vd * (max(data$Y)-min(data$Y))**2)
   
   (results <-tibble(r1, r0, rd, v1, v0, vd))
   return(results)
@@ -348,6 +348,7 @@ DCTMLE_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, 
   runs <- tibble(r1=double(), r0=double(), rd=double(), v1=double(), v0=double(), vd=double())
   
   #Run on num_cf splits
+  #num_cf=5
   for(cf in 1:num_cf){
     runs <- bind_rows(runs, DCTMLE_Single(data, exposure, outcome, covarsT, covarsO, learners, control))
   }

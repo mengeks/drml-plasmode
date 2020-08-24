@@ -3,6 +3,8 @@
 # plas.formula <- make.formula("Y5", "A1", ver=data.ver)
 # outForm <- plas.formula$outForm
 # expForm <- plas.formula$expForm
+
+
 # formulaOut = as.formula(outForm)
 # objectOut = NULL
 # formulaExp = as.formula(expForm)
@@ -12,12 +14,12 @@
 # effectOR = Effect_Size
 # MMOut = 1
 # MMExp = 1
-# nsim = plas_sim_N
+# nsim = Nsets
 # size = nrow(plas)
 # exposedPrev = NULL
-# set.seed(1111) # tweak seeds here
 
 
+# set.seed(plas.seed)
 
 PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,objectExp=NULL, data, idVar,
                               effectOR =1, MMOut=1,MMExp=1, nsim, size, eventRate=NULL, exposedPrev=NULL,
@@ -36,7 +38,7 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     
     x <- data[order(data[,exposure]),] # order according to exposure status, unexposed first
     n <- nrow(x)
-    n1 <- sum(x[,exposure])     # number of exposed in real data
+    n1 <- sum(as.numeric(x[,exposure]))    # number of exposed in real data
     n0 <- n - n1
     size1 <- round(ifelse(is.null(exposedPrev), n1, size*exposedPrev))  # desired number of exposed
     size0 <- size - size1 # desired number unexposed 
@@ -50,14 +52,27 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     # Adjusting the exposure prevalence in base cohort
     if(is.null(exposedPrev)) exposedPrev <- mean(modExp$y)
     bnewExp<- c(coef(modExp)[1], MMExp*coef(modExp)[-1])
-    # XbnewExp<- as.vector(XEXP%*%bnewExp)
-    # fnExp<- function(d)mean(plogis(d+XbnewExp))-exposedPrev
-    # deltaExp <- uniroot(fnExp, lower=-20, upper=20)$root
-    # Probexp <- plogis(deltaExp+XbnewExp)
-    # # resample new exposure measures
-    # # set.seed(1)
-    # x[exposure] <- rbinom(size,1,Probexp)
-    # rm(modExp, XEXP)
+    # if (generateA == T){
+    #   XbnewExp<- as.vector(XEXP%*%bnewExp)
+    #   fnExp<- function(d)mean(plogis(d+XbnewExp))-exposedPrev
+    #   deltaExp <- uniroot(fnExp, lower=-20, upper=20)$root
+    #   Probexp <- plogis(deltaExp+XbnewExp)
+    #   # resample new exposure measures
+    #   # set.seed(1)
+    #   x[exposure] <- rbinom(size,1,Probexp)
+    #   rm(modExp, XEXP)
+    # }
+    
+      XbnewExp<- as.vector(XEXP%*%bnewExp)
+      fnExp<- function(d)mean(plogis(d+XbnewExp))-exposedPrev
+      deltaExp <- uniroot(fnExp, lower=-20, upper=20)$root
+      Probexp <- plogis(deltaExp+XbnewExp)
+      # resample new exposure measures
+      if (generateA==T){
+        x[exposure] <- rbinom(size,1,Probexp)
+      }
+      rm(modExp, XEXP)
+    
     # Compute outcome model, using new exposures
     modOutCont <- glm2(formulaOut, family = "gaussian", x, control=glm.control(trace=F)) ## outcome model coefficients
     X <- gam(formulaOut, x, family = "gaussian", fit = FALSE)$X ## extract outcome model matrix
@@ -65,20 +80,33 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     bnew <- c(coef(modOutCont)[1], MMOut*coef(modOutCont)[-1]) # find intercept value needed to get approximate mean outcome
     bnew <- replace(bnew, names(coef(modOutCont)) == exposure, effectOR) # "inject" desired RD (beta coeff)
     EYnew <- as.vector(X %*% bnew)
-    Xbnew <- EYnew +rnorm(nrow(data),0,var(residuals(modOutCont))) # generate new outcome measure with noise
-    summary(Xbnew - EYnew) # DEBUG
-    mean(Xbnew[x[,exposure]==1]) - mean(Xbnew[x[,exposure]==0])
-    mean(EYnew[x[,exposure]==1]) - mean(EYnew[x[,exposure]==0])
+    # err <- rnorm(nrow(data),0,var(residuals(modOutCont)))
+    # Xbnew <- EYnew + err# generate new outcome measure with noise
+    # summary(Xbnew - EYnew) # DEBUG
+    # mean(Xbnew[x[,exposure]==1]) - mean(Xbnew[x[,exposure]==0])
+    # mean(EYnew[x[,exposure]==1]) - mean(EYnew[x[,exposure]==0])
+    
+    # 7 Aug 2020: We add residuals randomly after 
+    err <- residuals(modOutCont)
+    Xbnew <- EYnew
+    
     # # draw bootstrap sets
     ids <- ynew <- expnew <- data.frame(matrix(nrow = size, ncol = nsim)) # intialize replacement matrices 
     RR <- RD <- vector('numeric', length = nsim)
     As <- vector('numeric', length = nsim)#DEBUG
+    # sim<-1 #DEBUG
     for(sim in 1:nsim) {
       if(sim == 1 | (sim %% (nsim/2)) == 0) print(paste0("Drawing sample: ", sim, " (of ", nsim, ") ..."))
       idxs <- sample(1:n, size, replace = TRUE) # resample from all rows, with replacement
-      ids[1:size,sim] <- x[idxs, idVar] # specify the exact ID for those rows
+      if (sims.ver=="plas"){
+        ids[1:size,sim] <- x[idxs, idVar] # specify the exact ID for those rows
+      }else{
+        ids[1:size,sim] <-"ID1" # DUMMY
+      }
       expnew[,sim]<- x[idxs, exposure] # draw exposure values 
-      ynew[,sim] <- Xbnew[idxs] ### draw respective outcome values 
+      # ynew[,sim] <- Xbnew[idxs] + err # No bootstrap on errors
+      ynew[,sim] <- Xbnew[idxs] + err[sample(1:n, size, replace = TRUE)] # Bootstrap on errors
+      # ynew[,sim] <- Xbnew[idxs] # no error terms
       datasim<-X[idxs,]
       datasim[,2]<-1
       p_1<- as.vector(datasim %*% bnew)
