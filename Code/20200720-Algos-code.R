@@ -1,4 +1,7 @@
 
+expit <- function(x){
+  1/(1+exp(-x))
+}
 
 #expForm <- "A ~ L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
 #outForm <- "Y ~ A + L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
@@ -39,7 +42,7 @@
 ###############################
 getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=NULL,
                    doAIPW =0, doDCAIPW=0,
-                   doIPW = 0,
+                   doIPW = 0, doLASSO=0,
                    doTMLE = 0, doManuTMLE=0, doShortTMLE = 0,
                    doDCTMLE=0,
                    num_cf=5,
@@ -111,28 +114,98 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                             num_cf=num_cf)
     
     ATE <- DCAIPW$rd
-    SE <- DCAIPW$mvd
+    SE <- sqrt(DCAIPW$mvd)
     TYPE <- "DC-AIPW"
     res <- rbind(res, cbind(ATE, SE, TYPE))
   }
   
   # IPW + GLM
   if (doIPW == 1){
+    # gset <- set1
     num <- summary(glm(data = gset, formula = A ~ 1, family = "gaussian"))$coefficient[1,1]
     denom_fit <- glm(data = gset,
                      formula = as.formula(expForm),
-                     family = "binomial")
+                     family = "binomial",
+                     maxit=100)
+    summary(denom_fit)
     gset <- gset %>% add_column(denom = denom_fit$fitted.values) %>%
       mutate(wt = if_else(A == 1, num/denom, (1-num)/(1-denom))) #Stabilized IPTW
+    
     gset <- gset %>% mutate(wt2 = case_when(wt > quantile(gset$wt, 0.95) ~ quantile(gset$wt, 0.95),
                                             wt < quantile(gset$wt, 0.05) ~ quantile(gset$wt, 0.05),
                                             T ~ wt)) # Truncated IPTW
+    # hist(denom_fit$fitted.values)
+    # summary(denom_fit$fitted.values)
+    # hist(gset$wt)
+    # hist(gset$wt2)
+    # plot(gset$A, gset$denom)
+    # # mis-classification rate
+    # sum(gset$A*(gset$denom<0.9999) + (1-gset$A)*(gset$denom>0.0001))/length(gset$A)
+    # boxplot(gset$A*num/gset$denom)
+    # summary(gset$A*num/gset$denom)
+    # cbind(gset$A, gset$denom)
+    # boxplot((1-gset$A)*num/(1-gset$denom))
+    # summary((1-gset$A)*num/(1-gset$denom))
     model_glm <- glm(data = gset, weight = wt2,
                      formula = as.formula(outForm),
                      family = "gaussian")
     ATE <- summary(model_glm)$coefficients[2,1]
     SE <- summary(model_glm)$coefficients[2,2]
     TYPE <- "GLM + IPW"
+    res <- rbind(res, cbind(ATE, SE, TYPE))
+  }
+  
+  if (doLASSO == 1){
+    library(glmnet)
+    # gset <- set1
+    num <- summary(glm(data = gset, formula = A ~ 1, family = "gaussian"))$coefficient[1,1]
+    x_exp <- model.matrix(as.formula(expForm), data=gset)[,-1]
+    y_exp <- gset$A
+    
+    denom_fit <- cv.glmnet(y=y_exp, x=x_exp,
+                           family = "binomial")
+    # hist(expit(predict(denom_fit, newx = x_exp, s="lambda.min")))
+    # quantile(expit(predict(denom_fit, newx = x_exp, s="lambda.min")), c(0.05,0.95))
+    # fitted.values(denom_fit,s=lambda_min)
+    # hist(denom_fit$fitted.values)
+    # quantile(denom_fit$fitted.values, c(0.05,0.95))
+    gset <- gset %>% mutate(denom = expit(predict(denom_fit, newx = x_exp, s="lambda.min"))) %>%
+      mutate(wt = if_else(A == 1, num/denom, (1-num)/(1-denom))) #Stabilized IPTW
+    # hist(gset$wt)
+    #  quantile(gset$wt, c(0.05,0.95))
+    
+    gset <- gset %>% mutate(wt2 = case_when(wt > quantile(gset$wt, 0.95) ~ quantile(gset$wt, 0.95),
+                                            wt < quantile(gset$wt, 0.05) ~ quantile(gset$wt, 0.05),
+                                            T ~ wt)) # Truncated IPTW
+    # plot(gset$A, gset$denom)
+    # hist(gset$wt)
+    # hist(gset$wt2)
+    
+    x <- model.matrix(as.formula(outForm), data=gset)[,-1]
+    y <- gset$Y
+    
+    model_fit <- cv.glmnet(y=y, x=x,family = "gaussian")
+    y.pred <- predict(model_fit, newx = x, s="lambda.min")
+    # hist(y.pred)
+    
+    lambda_min <- model_fit$lambda.min
+    coefficients <- as.matrix(coef(model_fit,s=lambda_min))
+    coefficients <- coefficients[2:length(coefficients),]
+    # coefficients[1] <- 1
+    active.index <- which(coefficients != 0)
+    # active.coefficients <- coefficients[active.index]
+
+    x_min <- x[,active.index]
+    # x_min <- x[,-1]
+    # calculate propensity score, using min_lambda
+    new_data <- data.frame(cbind(y,x_min))
+    model_glm <- glm(y~.,data=new_data, weights=gset$wt2,family=gaussian())
+    # hist(model_glm$fitted.values)
+    # predict(model_fit, newx = x, s="lambda.min")
+    # summary(model_fit, s="lambda.min")
+    ATE <- summary(model_glm)$coefficients[2,1]
+    SE <- summary(model_glm)$coefficients[2,2]
+    TYPE <- "LASSO"
     res <- rbind(res, cbind(ATE, SE, TYPE))
   }
   
