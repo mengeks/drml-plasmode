@@ -4,13 +4,14 @@
 ### Outcome and exposure with high-dim covars (N = 331 covars)
 
 # Generate formula for low dim and high-dim, Y5/A1 and Y/A
-make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL",
-                         sims.ver = "plas"){
+make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL", 
+                         sims.ver = "plas",vars=c("VAR_1"),p=331){
   if (sims.ver == "plas"){
     if (ver == "FULL"){
       outForm <- paste0(outVar," ~ ",expVar)
       expForm <- paste0(expVar," ~ ")
-      for(i in 1:length(vars)){
+      # for(i in 1:length(vars)){
+      for(i in 1:p){
         outForm <- paste0(outForm," + ", vars[i])
         if(i == 1){expForm <- paste0(expForm, vars[i])}
         else{expForm <- paste0(expForm, " + ", vars[i])}
@@ -38,12 +39,12 @@ make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL",
 # Generate dataset. 
 # Options: ver: high-dim vs low-dim
 #         size, use.subset: N=1178 vs N < 1178; 
-make.set <- function(ver = "FULL", size = 200, plas,use.subset){
+make.set <- function(ver = "FULL", size = 200, plas,use.subset, p=331){
   if (size < 1178) {
     use.subset = T
   }
   if (ver == "FULL"){
-    plas <- data.frame(plas)
+    plas <- data.frame(plas)[,c(1:(2+p),ncol(plas))]
   }
   else{
     ## Outcome and exposure model with original, restricted covariate set (N = 16 covars)
@@ -92,20 +93,35 @@ draw_sims <- function(i){
 
 general.sim <- function(sims.ver = "plas"){
   if (sims.ver == "plas") {
-    out_path <- "/Users/garethalex/Desktop/HuangGroup/cvtmle_plasmode/Data/"
-    plas_org <- haven::read_dta(paste0(out_path,"plas_data.dta")) 
-    vars <- names(plas_org[3:333])
+    # out_path <- paste0(path,"/Data/")
+    plas_org <- haven::read_dta(paste0("./plas_data.dta")) 
+    
     
     # rm(.Random.seed, envir=.GlobalEnv)
-    plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=use.subset)
-    plas.formula <- make.formula("Y5", "A1", ver=data.ver)
+    if (estimateWithMore == T){
+      p.set <- p.est
+    }
+    else{
+      p.set <- p.sim
+    }
+    
+    set.seed(plas.seed)
+    if (randVar == T){
+      var.idx <- sample(1:p.set, p.set, replace=FALSE)
+    }
+    else{
+      var.idx <- 1:p.set
+    }
+    vars <- names(plas_org[3:333])[var.idx]
+    plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=use.subset,p=p.set)
+    
+    plas.formula <- make.formula("Y5", "A1", ver=data.ver,vars=vars, p=p.sim)
     outForm <- plas.formula$outForm
     expForm <- plas.formula$expForm
     
     
     # Effect_Size <- 6.6 # simulated risk difference = large change (e.g. absolute units)
     source("20200226-PlasmodeCont_Revised.R")
-    set.seed(plas.seed)
     plas_sims <- PlasmodeContNew(formulaOut = as.formula(outForm), objectOut = NULL,
                                  formulaExp = as.formula(expForm), objectExp = NULL,
                                  data = plas, idVar = "id", 
@@ -113,7 +129,8 @@ general.sim <- function(sims.ver = "plas"){
                                  nsim = plas_sim_N, size = nrow(plas),
                                  exposedPrev = NULL)
     return(list(plas_sims=plas_sims,
-                plas=plas))
+                plas=plas,
+                vars=vars))
   }else if (sims.ver == "5var.then.plas"){
     set.seed(427)
     Effect_Size <- 6.6 
@@ -130,7 +147,8 @@ general.sim <- function(sims.ver = "plas"){
                                  nsim = Nsets, size = nrow(plas),
                                  exposedPrev = NULL)
     return(list(plas_sims=plas_sims,
-                plas=plas))
+                plas=plas,
+                vars=vars))
   }else{
     ##################################
     # Generate basic sim dataset
