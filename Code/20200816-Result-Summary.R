@@ -77,7 +77,7 @@
 #   toc()
 # }
 
-Effect_Size <- 6.6
+# Effect_Size <- 6.6
 summarise.res <- function(boot1){
   tmp <- NULL
   N_boot <- length(boot1)

@@ -79,7 +79,7 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
     
     # # draw bootstrap sets
     ids <- ynew <- expnew <- data.frame(matrix(nrow = size, ncol = nsim)) # intialize replacement matrices 
-    RR <- RD <- vector('numeric', length = nsim)
+    p1.vec <- p0.vec <- RR <- RD <- vector('numeric', length = nsim)
     As <- vector('numeric', length = nsim)#DEBUG
     # sim<-1 #DEBUG
     for(sim in 1:nsim) {
@@ -101,15 +101,20 @@ PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,obje
       p_0<- as.vector(datasim %*% bnew)
       RR[sim]<-mean(p_1)/mean(p_0)
       RD[sim]<-mean(p_1)-mean(p_0)
+      p1.vec[sim]<-mean(p_1)
+      p0.vec[sim]<-mean(p_0)
     }
-    ARR<-mean(RR)
-    ARD<-mean(RD)
+    ARR<-mean(RR); ARD<-mean(RD)
+    Ap1 <- mean(p1.vec); Ap0 <-mean(p0.vec)
     names(ids) <- paste("ID", 1:nsim, sep = "")
     names(ynew) <- paste("OUTCOME", 1:nsim, sep = "")
     names(expnew)<-paste("EXPOSURE",1:nsim, sep = "")
     sim_out_bin<-data.frame(ids, ynew,expnew)
     
-    return(list(TrueOutBeta = bnew, TrueExpBeta = bnewExp, RR=ARR,RD=ARD,Sim_Data = sim_out_bin))
+    return(list(TrueOutBeta = bnew, TrueExpBeta = bnewExp, 
+                RR=ARR,RD=ARD,Sim_Data = sim_out_bin,
+                outForm=formulaOut, expForm=formulaExp,
+                p1=Ap1, p0=Ap0))
   }
   
   ########################################################################

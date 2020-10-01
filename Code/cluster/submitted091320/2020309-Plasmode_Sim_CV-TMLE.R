@@ -9,14 +9,13 @@
 #
 ####################################################################
 
-# install.packages(c("tidyverse", "ltmle", "Plasmode","ctmle","sl3","tmle3"))
-# install.packages("tidyverse")
 library(tidyverse)
+library(ggplot2)
 library(haven)
 library(readxl)
 library(table1)
 # library(ggbeeswarm)
-library(ltmle)
+# library(ltmle)
 library(Plasmode)
 library(SuperLearner)
 # library(ctmle)
@@ -29,7 +28,9 @@ library(foreach)
 library(randomForest)
 
 
-path <- "/n/home05/xmeng/cvtmle/submitted091320"
+# path <- "~/Desktop/HuangGroup/cvtmle_plasmode"
+# setwd(paste0(path,"/Code"))
+path <- "/n/holyscratch01/murphy_lab/Users/xmeng/submitted091320"
 setwd(paste0(path))
 set.seed(42782)
 options(tibble.print_max = 40, tibble.print_min = 30)
@@ -81,7 +82,7 @@ if (sims.ver == "plas"|sims.ver == "5var.then.plas"){
   sim_boots <- sims.obj
 }
 
-# plot(plas_sims$TrueOutBeta)
+plot(plas_sims$TrueOutBeta)
 
 
 ##################################
@@ -116,12 +117,12 @@ else{
 errorhandling="stop"
 # errorhandling="remove"
 
-N_sims <- 2# this should <= plas_sim_N
+N_sims <- 20# this should <= plas_sim_N
 
-doIPW = 0; doLASSO=1;
+doIPW = 0; doLASSO=0;
 doAIPW=0; doDCAIPW=0
 doManuTMLE=0; doShortTMLE = 0;
-doDCTMLE=0
+doDCTMLE=1
 num_cf=5
 #control=list()
 control=SuperLearner.CV.control(V=2)

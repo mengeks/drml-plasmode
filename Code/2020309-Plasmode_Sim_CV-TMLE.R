@@ -18,7 +18,7 @@ library(table1)
 # library(ltmle)
 library(Plasmode)
 library(SuperLearner)
-library(ctmle)
+#library(ctmle)
 library(sl3)
 library(tmle3)
 library(tictoc)
@@ -30,6 +30,8 @@ library(randomForest)
 
 path <- "~/Desktop/HuangGroup/cvtmle_plasmode"
 setwd(paste0(path,"/Code"))
+# path <- "/n/holyscratch01/murphy_lab/Users/xmeng/submitted092920"
+# setwd(paste0(path))
 set.seed(42782)
 options(tibble.print_max = 40, tibble.print_min = 30)
 no_cores <- detectCores(all.tests = T) - 2
@@ -41,6 +43,7 @@ registerDoParallel(cores=no_cores)
   sims.ver <- "plas"
   # sims.ver <- "5var"
   # sims.ver <- "5var.then.plas"
+  # sims.ver <- "5var.hard"
   
   Effect_Size <- 6.6
   
@@ -57,7 +60,10 @@ registerDoParallel(cores=no_cores)
   plas_sim_N <- 500; use.subset <- F
   generateA <- T
   estimateWithMore <- F; p.sim = 100;p.est <- 50
-  randVar = T # Do we permute variable order?
+  randVar = F # Do we permute variable order?
+  isHandPick = T; idx.handpick <- c(1,2,5,18, 217)
+  interact=T
+  
   
   ########
   # parameters for 5 var, 5var.then.plas
@@ -79,8 +85,10 @@ if (sims.ver == "plas"|sims.ver == "5var.then.plas"){
 }else{
   sim_boots <- sims.obj
 }
-
-plot(plas_sims$TrueOutBeta)
+# plas_sims$p0
+# plas_sims$p1
+# Plot the regression coefficient in Plasmode simulation
+# plot(plas_sims$TrueOutBeta)
 
 
 ##################################
@@ -110,18 +118,20 @@ else{
 }
 
 
-aipw_lib <- c("SL.glmnet")
+# aipw_lib <- c("SL.glmnet")
 
 errorhandling="stop"
 # errorhandling="remove"
 
+est.interact <- F # Estimate with first order interaction?
+
 N_sims <- 50# this should <= plas_sim_N
 
-doIPW = 0; doLASSO=1;
+doIPW = 1; doLASSO=0;
 doAIPW=0; doDCAIPW=0
 doManuTMLE=0; doShortTMLE = 0;
 doDCTMLE=0
-num_cf=5
+num_cf=0
 #control=list()
 control=SuperLearner.CV.control(V=2)
 }
@@ -136,7 +146,7 @@ source("20200904-run-sim-code.R")
 print(paste("Cores used:",no_cores))
 print(paste("plas.seed=",plas.seed, "generateA=",generateA, "sims.ver=",sims.ver))
 
-save(boot1, file=paste("./RDataFiles/091220.RData",sep=""))  
+save(boot1, file=paste("./RDataFiles/result.RData",sep=""))  
 
 
 
