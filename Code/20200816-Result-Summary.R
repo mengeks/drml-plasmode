@@ -1,104 +1,36 @@
 
-# run.est <- function(){
-#   set.seed(42782)
-#   tic()
-#   N_sims <- 10# this should <= plas_sim_N
-#   # DC implementation
-#   source("20200705-DCDR-Functions.R")
-#   # getRES function is now relocated to a separate file (20200720-Algos-code.R)
-#   source("20200720-Algos-code.R")
-#   
-#   # regression models for GLM / AIPW
-#   if (estimateWithMore == T){
-#     # out_path <- "/Users/garethalex/Desktop/HuangGroup/cvtmle_plasmode/Data/"
-#     plas_org <- haven::read_dta(paste0("./plas_data.dta"))
-#     vars <- names(plas_org[3:333])[1:p.est]
-#     p <- p.est
-#   }
-#   reg.formulas <- make.formula("Y", "A",ver = data.ver,sims.ver = sims.ver,vars=vars,p=p.est)
-#   expForm <- reg.formulas$expForm
-#   outForm <- reg.formulas$outForm
-#   
-#   # specify which set of learners for SL
-#   # ### NON-SMOOTH
-#   # short_tmle_lib <- SL_param_list
-#   # tmle_lib <- lrnr_SL
-#   # aipw_lib <- SL.lib
-#   # 
-#   # # SMOOTH
-#   # short_tmle_lib <- SL_list
-#   # tmle_lib <- lrnr_SL_param
-#   # aipw_lib <- SL.param
-#   
-#   
-#   # set .errorhandling="remove" if want to discard
-#   # set .errorhandling="stop" by default
-#   
-#   # boot1 <- foreach(i = 1:N_sims,.errorhandling="stop") %dopar% {
-#   boot1 <- foreach(i = 1:N_sims,.errorhandling="remove") %dopar% {
-#     require(tidyverse)
-#     require(tmle3)
-#     require(sl3)
-#     require(SuperLearner)
-#     
-#     # Initialize dataset
-#     if (sims.ver == "plas" | sims.ver =="5var.then.plas"){
-#       # i <- 11
-#       plas_data <- cbind(id = plas_sims$Sim_Data[i],
-#                          A = plas_sims$Sim_Data[i + (2*plas_sim_N)],
-#                          Y = plas_sims$Sim_Data[i + plas_sim_N])
-#       colnames(plas_data) <- c("id", "A", "Y")
-#       set1 <- suppressMessages(left_join(as_tibble(plas_data), as_tibble(plas))) #dplyr::select(as_tibble(plas), -Y5, -A1))) # add covariates
-#       tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y)))
-#       
-#     }else{
-#       # Initialize dataset
-#       # i<-2
-#       ss <- 600
-#       set1 <- as_tibble(cbind(C1 = sim_boots[[i]]$C1[1:ss],
-#                               C2 = sim_boots[[i]]$C2[1:ss],
-#                               C3 = sim_boots[[i]]$C3[1:ss],
-#                               C4 = sim_boots[[i]]$C4[1:ss],
-#                               C5 = sim_boots[[i]]$C5[1:ss],
-#                               A = sim_boots[[i]]$A[1:ss],
-#                               Y = sim_boots[[i]]$Y[1:ss]))
-#       tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y))) # generate a bounded Y for TMLE
-#     }
-#     getRES(set1, tset, aipw_lib, tmle_lib, short_tmle_lib,
-#            doIPW = 0, doLASSO=0,
-#            doAIPW=1, doDCAIPW=0,
-#            doManuTMLE=0, doShortTMLE = 0,
-#            doDCTMLE=0,
-#            num_cf=5,
-#            #control=list()
-#            control=SuperLearner.CV.control(V=2)
-#     )
-#   }
-#   toc()
-# }
 
 # Effect_Size <- 6.6
-summarise.res <- function(boot1){
+summarise.res <- function(boot1, wrt="all", Effect_Size=6.6){
   tmp <- NULL
   N_boot <- length(boot1)
   for(i in 1:N_boot){
     tmp <- rbind(tmp, boot1[[i]])
   }
-  
+  if ("t" %in% colnames(tmp)){
+    t.vec <- as.double(as_tibble(tmp)$t)
+  }else{
+    t.vec <- NA
+  }
   sim_corr1 <- as_tibble(tmp) %>% 
     mutate(ATE = as.double(ATE), SE = as.double(SE),
            lb = as.double(ATE) - 1.96*as.double(SE), 
-           ub = as.double(ATE) + 1.96*as.double(SE)) %>% 
+           ub = as.double(ATE) + 1.96*as.double(SE),
+           t = t.vec) %>% 
     add_column(iter = c(1:nrow(tmp))) %>% mutate(bias = as.double(ATE) - Effect_Size)
   
   #write_csv(plas_corr1, paste0(out_path, Sys.Date(), "-plasmode_sim_CV-TMLE_GLM_IPW_1000.csv"))
   
   sim_res <- sim_corr1 %>% group_by(TYPE) %>% 
-    summarize(b=length(ATE), mu_ATE = mean(ATE), med_ATE = median(ATE), 
+    summarize(b=length(ATE), med_t=median(t), mu_ATE = mean(ATE), med_ATE = median(ATE), 
               mu_SE = mean(SE), med_SE = median(SE), 
               mu_bias = mean(bias), med_bias = median(bias), 
               var = var(ATE), MSE = var + mu_bias^2,
               coverage = sum(lb <= Effect_Size & ub >= Effect_Size)/N_boot)
+  if (wrt !="all"){
+    sim_res <- sim_res %>%  filter(TYPE %in% wrt)
+  }
+  
   
   # out_path <- "/Users/garethalex/Desktop/HuangGroup/cvtmle_plasmode/Data/"
   # boot1.out <- data.frame(matrix(unlist(tmp),ncol=3))
@@ -134,3 +66,164 @@ summarise.res <- function(boot1){
   # sim_plot
   return(list(sim_res,sim_plot))
 }
+
+give.summary.res <- function(res.path, out.var,no_time){
+  load(res.path)
+  if (no_time){
+    boot_colnames <- c("ATE", "SE", "TYPE")
+  }else{
+    boot_colnames <- c("ATE", "SE", "TYPE", "t", "no_cores")
+  }
+  for (i in 1:length(boot1)){
+    colnames(boot1[[i]]) <- boot_colnames
+  }
+  # print(res.path)
+  sum.obj <- summarise.res(boot1,Effect_Size=Effect_Size)[[1]]
+  sum.var <- sum.obj[,out.var]
+  if (out.var == "med_bias"){
+    sum.var <- round(sum.var * 100,2)
+  }else if (out.var == "med_SE"){
+    sum.var <- round(sum.var,2)
+  }else{
+    sum.var <- round(sum.var,2)
+  }
+  return(sum.var)
+}
+
+violin.df.by.situ <- function(path.lst, situ.lst, ci.axis.coeff=0.55,non.par=T,
+                              folder ="RDataFiles")
+{
+  # Notice for DR estimators, we only plot non-parametric
+  library(ggplot2)
+  library(tidyverse)
+  # setwd("~/Desktop/HuangGroup/cvtmle_plasmode/Code")
+  # Effect_Size <- 6.6
+  # Effect_Size <- 5.51788
+  is.timing <- T; tim.str <- ifelse(is.timing,"-timing","")
+  
+  collapse.add.situ <- function(boot1,situ,par.type ="par"){
+    tmp <- NULL
+    N_boot <- length(boot1)
+    for(i in 1:N_boot){
+      colnames(boot1[[i]]) <- c("ATE", "SE", "TYPE", "t", "no_cores")
+      tmp <- rbind(tmp, boot1[[i]])
+    }
+    sum.obj <- summarise.res(boot1,Effect_Size=Effect_Size)[[1]]
+    sum.CI <- sum.obj[,"coverage"]$coverage
+    tmp <- as_tibble(tmp) %>% mutate(situ = situ, coverage=rep(sum.CI, N_boot))
+    if (tmp$TYPE[1] == "GLM + IPW"){
+      tmp$TYPE <- rep("IPW", N_boot)
+    }
+    if (tmp$TYPE[1] == "ManuTMLE"){
+      tmp$TYPE <- rep("TMLE", N_boot)
+    }
+    if (par.type=="non.par"){
+      tmp$TYPE <-  paste0(tmp$TYPE, ".non.par")
+    }else{
+      if ((tmp$TYPE[1]  != "IPW") && (tmp$TYPE[1]  != "GComp")){
+        tmp$TYPE <-  paste0(tmp$TYPE, ".par")
+      }
+    }
+    tmp$par.type <- rep(par.type, N_boot)
+    return(tmp)
+  }
+  violin.df <- data.frame()
+  
+  for (i in 1:length(path.lst)){
+    #i<-1
+    path <- path.lst[i]
+    situ <- situ.lst[i]
+    for (mtd in mtd.lst){
+      # mtd <- "DCTMLE"
+      res.path <- paste0(path,folder, "/result-",mtd,"-par",tim.str,".RData")
+      load(res.path)
+      violin.df <- rbind(violin.df, collapse.add.situ(boot1,situ))
+      if (non.par){
+        if ((mtd  != "IPW") && (mtd  != "GComp")){ # append non-par result
+          res.path <- paste0(path,folder, "/result-",mtd,"-non-par",tim.str,".RData")
+          load(res.path)
+          violin.df <- rbind(violin.df, collapse.add.situ(boot1,situ,par.type = "non.par"))
+        }
+      }
+    }
+  }
+  violin.df$TYPE <- factor(violin.df$TYPE, levels =factor.lst)
+  # unique(violin.df$TYPE)s
+  violin.df$situ <- factor(violin.df$situ, levels=situ.lst)
+  violin.df$ATE <- as.double(violin.df$ATE)
+  violin.df <- violin.df %>% mutate(bias = ATE - Effect_Size)
+  return(violin.df)
+}
+
+
+
+violin.plot <- function(violin.df, ci.axis.coeff=0.55){
+  library(cowplot)
+  library(ggplot2)
+  ggplot(violin.df, aes(x=TYPE)) +
+    geom_violin(aes(y=bias, fill=situ)) +
+    scale_y_continuous(
+      # Features of the first axis
+      name = "Bias",
+      # Add a second axis and specify its features
+      sec.axis = sec_axis(~.*ci.axis.coeff, name="CI coverage")
+    )+
+    geom_hline(yintercept=0.95/ci.axis.coeff, linetype="dashed", color = "red")+
+    geom_point(aes(y=coverage/ci.axis.coeff, fill=situ)) +facet_wrap(~ situ)+
+    geom_hline(yintercept=0, linetype="dashed", color = "black")+
+    scale_fill_discrete(name = "Situation")
+    
+}
+
+violin.plot.by.situ <- function(path.lst, situ.lst, ci.axis.coeff=0.55,folder ="RDataFiles")
+{
+  # Notice for DR estimators, we only plot non-parametric
+  violin.df <- violin.df.by.situ(path.lst, situ.lst, ci.axis.coeff=0.55,folder =folder)
+  violin.plot(violin.df, ci.axis.coeff)
+}
+
+violin.and.bar.plot <- function(violin.df, ci.axis.coeff=0.55){
+  library(cowplot)
+  library(ggplot2)
+  # input: violin.df for one situation
+  bias.plot <- ggplot(violin.df, aes(x=TYPE,y=bias, fill=par.type)) +
+    geom_violin(width=1) +
+    geom_boxplot(width=0.1, alpha=0.2) +
+    # geom_boxplot(width=0.1, color="grey", alpha=0.2) +
+    geom_hline(yintercept=0, linetype="dashed", color = "black")+
+    scale_fill_brewer(palette="RdBu",name = "Estimator Class")
+    # scale_fill_discrete()
+    
+  covg.df <- violin.df[seq(1,nrow(violin.df),by=100),]
+  covg.plot <- ggplot(covg.df, aes(x=TYPE, y=coverage, fill=par.type)) +
+    geom_bar(stat="identity",width = 0.5) +
+    geom_text(aes(label=coverage), vjust=-0.3, size=3.5)+
+    geom_hline(yintercept=0.95, linetype="dashed", color = "red")+
+    scale_fill_brewer(palette="RdBu",name = "Estimator Class")
+  
+  # title <- ggdraw() + draw_label(paste0("Bias and Coverage Plot for ",unique(covg.df$situ)[1]), fontface='bold')
+  # title <- ggdraw() + draw_label(paste0("Bias and Coverage Plot for
+  # bottom_row <- plot_grid(nutrient_boxplot, tss_flow_plot, ncol = 2, labels = "AUTO")
+  # plot_grid(title,bias.plot, covg.plot, nrow = 3, labels = c("", "", ""),
+  #           rel_heights = c(0.2, 1, 1))
+  plot_grid(bias.plot, covg.plot, nrow = 2, labels = c( "", ""),
+            rel_heights = c(1, 1))
+  
+}
+
+violin.and.bar.plot.by.situ <- function(path.lst, situ.lst, ci.axis.coeff=0.55,folder ="RDataFiles")
+{
+  # Notice for DR estimators, we only plot non-parametric
+  violin.df <- violin.df.by.situ(path.lst, situ.lst, ci.axis.coeff=0.55,non.par = T,folder =folder)
+  violin.and.bar.plot(violin.df, ci.axis.coeff)
+}
+
+append.res <-function(out.table.str, res.path, out.var,no_time){
+  # no_time <- T
+  sum.var <- give.summary.res(res.path, out.var,no_time )
+  out.table.str<- paste(out.table.str,"&", sum.var)
+  return(out.table.str)
+}
+
+
+

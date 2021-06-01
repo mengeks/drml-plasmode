@@ -26,17 +26,63 @@ library(doParallel)
 library(doRNG)
 library(foreach)
 library(randomForest)
+rm(list = ls())
+cluster <- T; is.timing <- T
+parallel.for.DC <- F # This is variable is controlling whether we use parallelism in DC_single fitting
+N_sims <- 100# this should <= plas_sim_N
+if (cluster == T){
+  # path <- "/n/holyscratch01/murphy_lab/Users/xmeng/submitted100220"
+  # setwd(paste0(path))
+  args = commandArgs(TRUE)
+  print(args)
+  est.method <- args[[1]];
+  non.par <- ifelse(args[[2]]=="non-par",T,F)
+  N_sims <- as.numeric(args[[3]])
+  is.timing <- !is.na(args[[4]])
+  doIPW = 0; doLASSO=0;
+  doAIPW=0; doDCAIPW=0
+  doManuTMLE=0; doDCTMLE=0; doGComp=0
+  num_cf=5
+  doShortTMLE = 0
+  #control=list()
+  control=SuperLearner.CV.control(V=2)
+  if (est.method=="non-DC"){
+    doIPW = 1; doLASSO=1;
+    doAIPW=1; doManuTMLE=1;
+  }else if (est.method=="DCTMLE"){
+    doDCTMLE = 1
+  }else if (est.method=="DCAIPW"){
+    doDCAIPW = 1
+  }else if (est.method=="TMLE"){
+    doManuTMLE=1
+  }else if (est.method=="AIPW"){
+    doAIPW=1
+  }else if (est.method=="IPW"){
+    doIPW=1
+  }else if (est.method=="GComp"){
+    doGComp=1
+  }
+  
+  
+  if (is.timing==T){
+    no_cores <- as.numeric(args[[5]])
+  }else{
+    no_cores <- detectCores(all.tests = T) - 2
+  }
+}else{
+  non.par <- F
+  est.method <- ''
+  no_cores <- detectCores(all.tests = T) - 2
+  setwd("~/Desktop/HuangGroup/cvtmle_plasmode/Code/cluster/no4correct")
+  # path <- "~/Desktop/HuangGroup/cvtmle_plasmode"
+  # setwd(paste0(path,"/Code"))
+}
 
-
-path <- "~/Desktop/HuangGroup/cvtmle_plasmode"
-setwd(paste0(path,"/Code"))
-# path <- "/n/holyscratch01/murphy_lab/Users/xmeng/submitted092920"
-# setwd(paste0(path))
 set.seed(42782)
 options(tibble.print_max = 40, tibble.print_min = 30)
-no_cores <- detectCores(all.tests = T) - 2
-registerDoParallel(cores=no_cores)
 
+registerDoParallel(cores=no_cores)
+print(no_cores)
 
 # Set simulation parameters
 {
@@ -61,8 +107,10 @@ registerDoParallel(cores=no_cores)
   generateA <- T
   estimateWithMore <- F; p.sim = 100;p.est <- 50
   randVar = F # Do we permute variable order?
-  isHandPick = T; idx.handpick <- c(1,2,5,18, 217)
-  interact=T
+  isHandPick = T; idx.handpick <- c(1,2,5,18, 217, 2:40)
+  interact=T; 
+  interact.w.exp = F
+  est.interact <- T # Estimate with first order interaction?
   
   
   ########
@@ -85,11 +133,12 @@ if (sims.ver == "plas"|sims.ver == "5var.then.plas"){
 }else{
   sim_boots <- sims.obj
 }
-# plas_sims$p0
-# plas_sims$p1
+
 # Plot the regression coefficient in Plasmode simulation
 # plot(plas_sims$TrueOutBeta)
-
+print("Simulation: ")
+print(paste0("OR form: ",plas_sims$outForm))
+print(paste0("PS form: ",plas_sims$expForm))
 
 ##################################
 ## PARALLELIZE ANALYSES
@@ -102,7 +151,7 @@ if (sims.ver == "plas"|sims.ver == "5var.then.plas"){
   source("20200720-Algos-code.R")
 
 
-non.par <- F
+
 # specify which set of learners for SL
 if (non.par == T){
   ### NON-SMOOTH
@@ -117,38 +166,49 @@ else{
   aipw_lib <- SL.param
 }
 
-
+N_sims<- 100
 # aipw_lib <- c("SL.glmnet")
 
-errorhandling="stop"
-# errorhandling="remove"
+# errorhandling="stop"
+errorhandling="remove"
 
-est.interact <- F # Estimate with first order interaction?
-
-N_sims <- 50# this should <= plas_sim_N
-
-doIPW = 1; doLASSO=0;
-doAIPW=0; doDCAIPW=0
-doManuTMLE=0; doShortTMLE = 0;
-doDCTMLE=0
-num_cf=0
-#control=list()
-control=SuperLearner.CV.control(V=2)
+if (cluster != T){
+  doIPW = 0; doLASSO=0;
+  doAIPW=0; doDCAIPW=0
+  doManuTMLE=1; doDCTMLE=0
+  num_cf=5; doGComp=0
+  doShortTMLE = 0
+  #control=list()
+  control=SuperLearner.CV.control(V=2)
 }
+}
+
+
 
 
 #########
 # run
 ##########
+ptm0 <- proc.time()
 source("20200904-run-sim-code.R")
+ptm1 <- proc.time()
 
-# print(paste("It takes",round((ptm1 - ptm0)[3],2),"s"))
+print(paste("It takes",round((ptm1 - ptm0)[3],2),"s"))
 print(paste("Cores used:",no_cores))
+print(paste("estmate method:",est.method))
 print(paste("plas.seed=",plas.seed, "generateA=",generateA, "sims.ver=",sims.ver))
+print(paste0("is.timing==",is.timing))
+print(paste("./RDataFiles/result-",est.method,"-",args[[2]],"-timing.RData",sep=""))
+print(length(boot1))
 
-save(boot1, file=paste("./RDataFiles/result.RData",sep=""))  
-
-
-
-
+if (is.timing == F){
+  save(boot1, file=paste("./RDataFiles/result-",est.method,"-",args[[2]],".RData",sep="")) 
+}else{
+  # est.method = "IPW"; args =list("", "par") #DEBUG
+  save(boot1, file=paste("./RDataFiles/result-",est.method,"-",args[[2]],"-timing.RData",sep=""))
+  tm <- round((ptm1 - ptm0)[3],2)
+  tm <- data.frame(tm)
+  save(tm, file=paste("./RDataFiles/time-",est.method,"-",no_cores,"cores.RData",sep=""))
+}
+ 
 

@@ -1,0 +1,4 @@
+*.RData
+Code/cluster/
+Code/Plot/
+SelfReading/

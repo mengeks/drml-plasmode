@@ -1,13 +1,4 @@
 # # Newey and Robins DCDR
-# i <- 1
-# set1 <- as_tibble(cbind(C1 = sim_boots2[[i]]$C1[1:ss],
-#                         C2 = sim_boots2[[i]]$C2[1:ss],
-#                         C3 = sim_boots2[[i]]$C3[1:ss],
-#                         C4 = sim_boots2[[i]]$C4[1:ss],
-#                         C5 = sim_boots2[[i]]$C5[1:ss],
-#                         A = sim_boots2[[i]]$A[1:ss],
-#                         Y = sim_boots2[[i]]$Y[1:ss]))
-# tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y))) # generate a bounded Y for TMLE
 # 
 # data <- tset # DEBUG
 # learners <- aipw_lib # DEBUG
@@ -18,7 +9,7 @@
 # exposure <- as.character(as.formula(expForm)[[2]]) # DEBUG
 
 # Function that does DCDR using input data and super learner with a given seed
-DCDR_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, control){
+DCDR_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, control, parallel=T){
   
   #Split sample
   splits <- sample(rep(1:3, diff(floor(nrow(data) * c(0, 1/3, 2/3, 3/3)))))
@@ -37,10 +28,18 @@ DCDR_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, con
     # dat <- dat_nested$data # DEBUG
     n.df <- length(dat)
     res <- vector("list", length = n.df)
-    res<-foreach(i = 1:n.df) %dopar% {
-      df <- dat[[i]]
-      SuperLearner(Y=as.matrix(df[, exposure])[,1], X=data.frame(df[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
+    if (parallel){
+      res<-foreach(i = 1:n.df) %dopar% {
+        df <- dat[[i]]
+        SuperLearner(Y=as.matrix(df[, exposure])[,1], X=data.frame(df[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
+      }
+    }else{
+      for (i in 1:n.df) {
+        df <- dat[[i]]
+        res[[i]] <- SuperLearner(Y=as.matrix(df[, exposure])[,1], X=data.frame(df[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
+      }
     }
+    
     return(res)
   }
   
@@ -61,10 +60,18 @@ DCDR_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, con
     # dat <- dat_nested$data # DEBUG
     n.df <- length(dat)
     res <- vector("list", length = n.df)
-    res<-foreach(i = 1:n.df) %dopar% {
-      df <- dat[[i]]
-      SuperLearner(Y=as.matrix(df[, outcome])[,1], X=data.frame(df[, covarsO]), SL.library=learners, cvControl=control)
+    if (parallel){
+      res<-foreach(i = 1:n.df) %dopar% {
+        df <- dat[[i]]
+        SuperLearner(Y=as.matrix(df[, outcome])[,1], X=data.frame(df[, covarsO]), SL.library=learners, cvControl=control)
+      }
+    }else{
+      for (i in 1:n.df){
+        df <- dat[[i]]
+        res[[i]] <- SuperLearner(Y=as.matrix(df[, outcome])[,1], X=data.frame(df[, covarsO]), SL.library=learners, cvControl=control)
+      }
     }
+    
     return(res)
   }
   
@@ -148,14 +155,14 @@ DCDR_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, con
 
 
 # Function that does DCDR over multiple sample splits and combines results
-DCDR_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, control, num_cf){
+DCDR_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, control, num_cf,parallel){
   
   #Initialize results
   runs <- tibble(r1=double(), r0=double(), rd=double(), v1=double(), v0=double(), vd=double())
   
   #Run on num_cf splits
   for(cf in 1:num_cf){
-    runs <- bind_rows(runs, DCDR_Single(data, exposure, outcome, covarsT, covarsO, learners, control))
+    runs <- bind_rows(runs, DCDR_Single(data, exposure, outcome, covarsT, covarsO, learners, control,parallel))
   }
   #Medians of splits
   medians <- sapply(runs, median)
@@ -173,7 +180,7 @@ DCDR_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, co
 }
 
 # Function that does DCTMLE using input data and super learner with a given seed
-DCTMLE_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, control){
+DCTMLE_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, control,parallel=T){
   # Bound data
   data <- data %>% mutate(YT=ifelse(YT<0.005, 0.005, ifelse(YT>0.995,0.995, YT)))
   
@@ -194,10 +201,19 @@ DCTMLE_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, c
     # dat <- dat_nested$data # DEBUG
     n.df <- length(dat)
     res <- vector("list", length = n.df)
-    res<-foreach(i = 1:n.df) %dopar% {
-      df <- dat[[i]]
-      SuperLearner(Y=as.matrix(df[, exposure])[,1], X=data.frame(df[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
+    if (parallel){
+      res<-foreach(i = 1:n.df) %dopar% {
+        df <- dat[[i]]
+        SuperLearner(Y=as.matrix(df[, exposure])[,1], X=data.frame(df[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
+      }
+    }else{
+      for (i in 1:n.df){
+        # i=1
+        df <- dat[[i]]
+        res[[i]] <- SuperLearner(Y=as.matrix(df[, exposure])[,1], X=data.frame(df[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
+      }
     }
+    
     return(res)
   }
   
@@ -215,10 +231,18 @@ DCTMLE_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, c
     # dat <- dat_nested$data # DEBUG
     n.df <- length(dat)
     res <- vector("list", length = n.df)
-    res<-foreach(i = 1:n.df) %dopar% {
-      df <- dat[[i]]
-      SuperLearner(Y=as.matrix(df[, "YT"])[,1], X=data.frame(df[, covarsO]), SL.library=learners, cvControl=control)
+    if (parallel){
+      res<-foreach(i = 1:n.df) %dopar% {
+        df <- dat[[i]]
+        SuperLearner(Y=as.matrix(df[, "YT"])[,1], X=data.frame(df[, covarsO]), SL.library=learners, cvControl=control)
+      }
+    }else{
+      for (i in 1:n.df) {
+        df <- dat[[i]]
+        res[[i]] <- SuperLearner(Y=as.matrix(df[, "YT"])[,1], X=data.frame(df[, covarsO]), SL.library=learners, cvControl=control)
+      }
     }
+    
     return(res)
   }
   
@@ -341,7 +365,7 @@ DCTMLE_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, c
 }
 
 # Function that does DCTMLE over multiple sample splits and combines results
-DCTMLE_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, control, num_cf){
+DCTMLE_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, control, num_cf,parallel){
   
   #Initialize results
   runs <- tibble(r1=double(), r0=double(), rd=double(), v1=double(), v0=double(), vd=double())
@@ -349,7 +373,7 @@ DCTMLE_Multiple <-function(data, exposure, outcome, covarsT, covarsO, learners, 
   #Run on num_cf splits
   #num_cf=5
   for(cf in 1:num_cf){
-    runs <- bind_rows(runs, DCTMLE_Single(data, exposure, outcome, covarsT, covarsO, learners, control))
+    runs <- bind_rows(runs, DCTMLE_Single(data, exposure, outcome, covarsT, covarsO, learners, control,parallel))
   }
   #Medians of splits
   medians <- sapply(runs, median)
@@ -476,10 +500,32 @@ TMLE <- function(data, exposure, outcome, covarsT, covarsO, learners, control){
   data <- data.frame(data)
   data <- data %>% mutate(YT=ifelse(YT<0.005, 0.005, ifelse(YT>0.995,0.995, YT)))
   
-  pi_fit <- SuperLearner(Y=as.matrix(data[, exposure])[,1], X=data.frame(data[, covarsT]), family=binomial(), SL.library=learners, cvControl=control)
-  mu_fit <- SuperLearner(Y=as.matrix(data[, "YT"])[,1], X=data.frame(data[, covarsO]), SL.library=learners, cvControl=control)
-   
-
+  # options(mc.cores = no_cores)
+  # getOption("mc.cores")
+  # pi_fit <- CV.SuperLearner(Y=as.matrix(data[, exposure])[,1], X=data.frame(data[, covarsT])
+  #                           , family=binomial(), SL.library=learners, cvControl=control,
+  #                           parallel = "multicore")
+  # mu_fit <- CV.SuperLearner(Y=as.matrix(data[, "YT"])[,1], X=data.frame(data[, covarsO])
+  #                           , SL.library=learners, cvControl=control,
+  #                           parallel = "multicore")
+  
+  # pi_fit <- SuperLearner(Y=as.matrix(data[, exposure])[,1], X=data.frame(data[, covarsT]), 
+  # family=binomial(), SL.library=learners, cvControl=control) #OLD
+  # mu_fit <- SuperLearner(Y=as.matrix(data[, "YT"])[,1], 
+  # X=data.frame(data[, covarsO]), SL.library=learners, cvControl=control) #OLD
+  exp_vec <- pull(select(data, exposure))
+  exp_pred_mat <- model.matrix(object = as.formula(expForm), data=data)[,-1]
+  exp_pred_mat <- data.frame(exp_pred_mat)
+  out_pred_mat <- model.matrix(object = as.formula(outForm), data=data)[,-1]
+  out_pred_mat <- data.frame(out_pred_mat)
+  out_x1_mat <- out_x0_mat <- out_pred_mat
+  out_x1_mat[exposure] <- rep(1, length(exp_vec))
+  out_x0_mat[exposure] <- rep(0, length(exp_vec))
+  pi_fit <- SuperLearner(Y=as.matrix(data[, exposure])[,1], X=exp_pred_mat,
+                         family=binomial(), SL.library=learners, cvControl=control) #CHANGE
+  mu_fit <- SuperLearner(Y=as.matrix(data[, "YT"])[,1], X=out_pred_mat,
+                         SL.library=learners, cvControl=control)
+  
   
   #Calc mu using each split
   dat1 <- data
@@ -487,12 +533,18 @@ TMLE <- function(data, exposure, outcome, covarsT, covarsO, learners, control){
   
   dat0 <- data
   dat0[,exposure]<- 0
-  
+  # 
+  # data <- data %>%
+  #   mutate(mu = predict(mu_fit, newdata = data.frame(data[, covarsO]))$pred,
+  #          mu1 = predict(mu_fit, newdata = data.frame(dat1[, covarsO]))$pred,
+  #          mu0 = predict(mu_fit, newdata = data.frame(dat0[, covarsO]))$pred,
+  #          pi = predict(pi_fit, newdata = data.frame(data[, covarsT]))$pred) #OLD
+  # 
   data <- data %>%
-    mutate(mu = predict(mu_fit, newdata = data.frame(data[, covarsO]))$pred,
-           mu1 = predict(mu_fit, newdata = data.frame(dat1[, covarsO]))$pred,
-           mu0 = predict(mu_fit, newdata = data.frame(dat0[, covarsO]))$pred,
-           pi = predict(pi_fit, newdata = data.frame(data[, covarsT]))$pred)
+    mutate(mu = predict(mu_fit, newdata = out_pred_mat)$pred,
+           mu1 = predict(mu_fit, newdata = out_x1_mat)$pred,
+           mu0 = predict(mu_fit, newdata = out_x0_mat)$pred,
+           pi = predict(pi_fit, newdata = exp_pred_mat)$pred)
   
   exp_vec <- pull(select(data, exposure))
   data <- data %>% mutate(statin=exp_vec)

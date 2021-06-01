@@ -5,26 +5,46 @@
 
 # Generate formula for low dim and high-dim, Y5/A1 and Y/A
 make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL", 
-                         sims.ver = "plas",vars=c("VAR_1"),p=331,interact=F){
+                         sims.ver = "plas",vars=c("VAR_1"),p=331,interact=F,
+                         interact.w.exp = F){
   if (sims.ver == "plas"){
     if (ver == "FULL"){
       outForm <- paste0(outVar," ~ ")
+      if ( interact.w.exp == F){
+      outForm <- paste0(outForm, expVar, " + ")
+      }
       expForm <- paste0(expVar," ~ ")
       if (interact==T){
         outForm <- paste0(outForm," ( ")
         expForm <- paste0(expForm," (")
       }
-      outForm <- paste0(outForm, expVar)
+      if ( interact.w.exp == T){
+        outForm <- paste0(outForm, expVar)
+      }
       # for(i in 1:length(vars)){
       p <- length(vars)
-      for(i in 1:p){
-        outForm <- paste0(outForm," + ", vars[i])
-        if(i == 1){expForm <- paste0(expForm, vars[i])}
-        else{expForm <- paste0(expForm, " + ", vars[i])}
+      for(i in 1:5){
+        if(i == 1){
+          expForm <- paste0(expForm, vars[i])
+          if ( interact.w.exp == T){
+            outForm <- paste0(outForm, " + ",vars[i])
+          }else{
+            outForm <- paste0(outForm, vars[i])
+          }
+            
+        }else{expForm <- paste0(expForm, " + ", vars[i])
+        outForm <- paste0(outForm, " + ",vars[i])
+        }
       }
       if (interact==T){
         outForm <- paste0(outForm," )^2")
         expForm <- paste0(expForm," )^2")
+      }
+      if (p > 5){
+        for(i in 6:p){
+          expForm <- paste0(expForm, " + ", vars[i])
+          outForm <- paste0(outForm, " + ",vars[i])
+        }
       }
     }else{
       confVar <- "L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
@@ -132,9 +152,10 @@ general.sim <- function(sims.ver = "plas"){
     plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=use.subset)
     
     # plas.formula <- make.formula("Y5", "A1", ver=data.ver,vars=vars, p=p.sim, interact=interact)
-    plas.formula <- make.formula("Y5", "A1", ver=data.ver,vars=vars, interact=interact)
+    plas.formula <- make.formula("Y5", "A1", ver=data.ver,vars=vars, interact=interact,
+                                 interact.w.exp=interact.w.exp )
     
-    outForm <- plas.formula$outForm
+    (outForm <- plas.formula$outForm)
     expForm <- plas.formula$expForm
     
     

@@ -44,65 +44,60 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                    doAIPW =0, doDCAIPW=0,
                    doIPW = 0, doLASSO=0,
                    doTMLE = 0, doManuTMLE=0, doShortTMLE = 0,
-                   doDCTMLE=0,
+                   doDCTMLE=0,doGComp=0,
                    num_cf=5,
-                   control){
+                   control,parallel=T){
   res <- NULL
   
   # AIPW
   if (doAIPW == 1){
     # AIPW
+    ptm0 <- proc.time()
     outcome <- as.character(as.formula(outForm)[[2]])
     exposure <- as.character(as.formula(expForm)[[2]])
     out_vec <- pull(select(gset, outcome))
     exp_vec <- pull(select(gset, exposure))
     
-    # denom_fit <- glm(data = gset, formula = as.formula(expForm), family = "binomial",fit=FALSE)
-    # gmodel <- glm(data = gset, formula = as.formula(outForm), family = "gaussian",fit=FALSE)
-    #
-    # expVars <- names(denom_fit$coefficients)[2:length(denom_fit$coefficients)]
-    # exp_pred_mat <- data.frame(select(gset, expVars))
     exp_pred_mat <- model.matrix(object = as.formula(expForm), data=gset)[,-1]
     exp_pred_mat <- data.frame(exp_pred_mat)
-    suppressMessages(learnPS <- SuperLearner(Y = exp_vec, X = exp_pred_mat, SL.library = aipw_lib, family = binomial()))
+    suppressMessages(learnPS <- SuperLearner(Y = exp_vec, X = exp_pred_mat, 
+                                             SL.library = aipw_lib, family = binomial(),
+                                             cvControl=control))
+    # SuperLearner(Y=as.matrix(data[, exposure])[,1], X=data.frame(data[, covarsT]), 
+    #              family=binomial(), SL.library=learners, cvControl=control)
     pred_ps <- c(learnPS$SL.predict)
-    
-    # outVars <- names(gmodel$coefficients)[2:length(gmodel$coefficients)]
-    # out_pred_mat <- data.frame(select(gset, outVars))
+    # ptmps <- proc.time()
+    # print(paste0("pscore fitting takes ", round((ptmps - ptm0)[3],3), "s"))
+
     out_pred_mat <- model.matrix(object = as.formula(outForm), data=gset)[,-1]
     out_pred_mat <- data.frame(out_pred_mat)
     out_x1_mat <- out_x0_mat <- out_pred_mat
     out_x1_mat[exposure] <- rep(1, length(exp_vec))
     out_x0_mat[exposure] <- rep(0, length(exp_vec))
     
-    # learnOut_1 <- SuperLearner(Y = as.matrix(out_vec), X = out_pred_mat, newX = out_x1_mat, SL.library = aipw_lib)
-    # pred_x1 <- c(learnOut_1$SL.predict)
-    # learnOut_0 <- SuperLearner(Y = as.matrix(out_vec), X = out_pred_mat, newX = out_x0_mat, SL.library = aipw_lib)
-    # pred_x0 <- c(learnOut_0$SL.predict)
-    
-    psm <- SuperLearner(Y = as.matrix(out_vec), X = out_pred_mat, SL.library = aipw_lib)
+    psm <- SuperLearner(Y = as.matrix(out_vec), X = out_pred_mat, SL.library = aipw_lib,cvControl=control)
+    # ptmor <- proc.time()
+    # print(paste0("OR fitting takes ", round((ptmor - ptmps)[3],3), "s"))
     pred_x1 <- predict(psm , newdata = out_x1_mat)$pred
     pred_x0 <- predict(psm , newdata = out_x0_mat)$pred
     
     gset <- gset %>% mutate(ps_u = 1-pred_ps, ps_t = pred_ps, pred_u = pred_x0, pred_t = pred_x1)
     
     
-    # ps_u = (1-denom_fit$fitted.values), ps_t = denom_fit$fitted.values,
-    # pred_u = predict(gmodel, data.frame(C1 = gset$C1, C2 = gset$C2, C3 = gset$C3,
-    #                                     C4 = gset$C4, C5 = gset$C5, A = rep(0, nrow(gset)))),
-    # pred_t = predict(gmodel, data.frame(C1 = gset$C1, C2 = gset$C2, C3 = gset$C3,
-    #                                     C4 = gset$C4, C5 = gset$C5, A = rep(1, nrow(gset)))))
-    
     aipw <- RCAL::ate.aipw(y = gset$Y, tr = gset$A, mfp = cbind(gset$ps_u, gset$ps_t), mfo = cbind(gset$pred_u, gset$pred_t))
+    # ptmrcal <- proc.time()
+    # print(paste0("RCAL takes ", round((ptmrcal - ptmor)[3],3), "s"))
     ATE <- aipw$diff.est[2]
     SE <- sqrt(aipw$diff.var[2])
     TYPE <- "AIPW"
-    res <- rbind(res, cbind(ATE, SE, TYPE))
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
   }
   
   if (doDCAIPW==1){
     
-    
+    ptm0 <- proc.time()
     # DC-AIPW
     outcome <- as.character(as.formula(outForm)[[2]])
     exposure <- as.character(as.formula(expForm)[[2]])
@@ -111,17 +106,20 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
                             covarsO=all.vars(as.formula(outForm))[-1],
                             learners=aipw_lib,
                             control=control, 
-                            num_cf=num_cf)
+                            num_cf=num_cf,parallel=parallel)
     
     ATE <- DCAIPW$rd
     SE <- sqrt(DCAIPW$mvd)
     TYPE <- "DC-AIPW"
-    res <- rbind(res, cbind(ATE, SE, TYPE))
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
   }
   
   # IPW + GLM
   if (doIPW == 1){
     # gset <- set1
+    ptm0 <- proc.time()
     num <- summary(glm(data = gset, formula = A ~ 1, family = "gaussian"))$coefficient[1,1]
     denom_fit <- glm(data = gset,
                      formula = as.formula(expForm),
@@ -146,16 +144,24 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     # cbind(gset$A, gset$denom)
     # boxplot((1-gset$A)*num/(1-gset$denom))
     # summary((1-gset$A)*num/(1-gset$denom))
-    model_glm <- glm(data = gset, weight = wt2,
-                     formula = as.formula(outForm),
-                     family = "gaussian")
+    # model_glm <- glm(data = gset, weight = wt2,
+    #                  formula = as.formula(outForm),
+    #                  family = "gaussian")
+    require("survey")
+    model_glm <-(svyglm(Y ~ A, design = svydesign(~ 1, weights = ~ wt2,
+                                                  data = gset)))
     ATE <- summary(model_glm)$coefficients[2,1]
-    SE <- summary(model_glm)$coefficients[2,2]
+    library(sandwich)
+    SE<-sqrt(diag(vcovHC(model_glm, type="HC0")))[2]
+    # SE <- summary(model_glm)$coefficients[2,2]
     TYPE <- "GLM + IPW"
-    res <- rbind(res, cbind(ATE, SE, TYPE))
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
   }
   
   if (doLASSO == 1){
+    ptm0 <- proc.time()
     library(glmnet)
     # gset <- set1
     num <- summary(glm(data = gset, formula = A ~ 1, family = "gaussian"))$coefficient[1,1]
@@ -206,7 +212,9 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     ATE <- summary(model_glm)$coefficients[2,1]
     SE <- summary(model_glm)$coefficients[2,2]
     TYPE <- "LASSO"
-    res <- rbind(res, cbind(ATE, SE, TYPE))
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
   }
   
   # CV-TMLE default specification
@@ -215,6 +223,23 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
   # ATE <- tmle3_autofit$summary$tmle_est
   # SE <- tmle3_autofit$summary$se
   
+  # GComputation
+  if (doGComp == 1){
+    # gset <- set1
+    ptm0 <- proc.time()
+    model_glm <- glm(data = gset,
+                     formula = as.formula(outForm),
+                     family = "gaussian")
+    ate.vector <- rep(0,length(coef(model_glm)))
+    ate.vector[2] <- 1; # ate.vector[8:12] <- colMeans(gset[,5+idx.handpick])
+    
+    ATE <- coef(model_glm) %*% ate.vector
+    SE <- sqrt(t(ate.vector) %*% vcov(model_glm) %*% ate.vector)
+    TYPE <- "GComp"
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
+  }
   # CV-TMLE full specification
   if (doTMLE == 1){
     tmle_task <- tmle3_Task$new(tset, npsem = npsem)
@@ -251,6 +276,7 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
   
   if (doManuTMLE==1){
     # Manual TMLE
+    ptm0 <- proc.time()
     outcome <- as.character(as.formula(outForm)[[2]])
     exposure <- as.character(as.formula(expForm)[[2]])
     TMLE <- TMLE(data=tset, exposure=exposure, outcome=outcome,
@@ -262,23 +288,30 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     ATE <- TMLE$rd
     SE <- sqrt(TMLE$vd)
     TYPE <- "ManuTMLE"
-    res <- rbind(res, cbind(ATE, SE, TYPE))
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
   }
   
   if (doDCTMLE==1){
     # DC-TMLE
+    ptm0 <- proc.time()
     outcome <- as.character(as.formula(outForm)[[2]])
     exposure <- as.character(as.formula(expForm)[[2]])
     DCTMLE <- DCTMLE_Multiple(data=tset, exposure=exposure, outcome=outcome,
                               covarsT=all.vars(as.formula(expForm))[-1],
                               covarsO=all.vars(as.formula(outForm))[-1],
                               learners=aipw_lib,
-                              control=control, num_cf=num_cf)
+                              control=control, num_cf=num_cf,
+                              parallel=parallel)
+    
     
     ATE <- DCTMLE$rd
     SE <- sqrt(DCTMLE$mvd)
     TYPE <- "DC-TMLE"
-    res <- rbind(res, cbind(ATE, SE, TYPE))
+    ptm1 <- proc.time()
+    t <- round((ptm1 - ptm0)[3],3)
+    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
   }
   
   return(res)

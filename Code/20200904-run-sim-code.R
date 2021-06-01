@@ -14,11 +14,22 @@
     vars <- names(plas_org[3:333])[1:p.est]
     p <- p.est
   }
-  reg.formulas <- make.formula("Y", "A",ver = data.ver,sims.ver = sims.ver,vars=vars, interact = est.interact)
+  # idx.handpick <- c(1,2,5,18, 217, sample(2:40,10))
+  # if (isHandPick == T){
+  #   var.idx <- idx.handpick
+  #   plas_org <- haven::read_dta(paste0("./plas_data.dta")) 
+  #   vars <- names(plas_org[3:333])[var.idx]
+  # }
+  
+  reg.formulas <- make.formula("Y", "A",ver = data.ver,sims.ver = sims.ver, vars=vars,
+                               interact = T,
+                               interact.w.exp = F)
   expForm <- reg.formulas$expForm
   outForm <- reg.formulas$outForm
-  
-  
+
+  print("Estimation: ")
+  print(paste0("OR form: ",outForm))
+  print(paste0("PS form: ",expForm))
   
   
   # set .errorhandling="remove" if want to discard
@@ -33,7 +44,7 @@
     
     # Initialize dataset
     if (sims.ver == "plas" | sims.ver =="5var.then.plas"){
-      # i <- 11
+      # i <- 1
       plas_data <- cbind(id = plas_sims$Sim_Data[i],
                          A = plas_sims$Sim_Data[i + (2*plas_sim_N)],
                          Y = plas_sims$Sim_Data[i + plas_sim_N])
@@ -59,10 +70,11 @@
            doAIPW=doAIPW, 
            doDCAIPW=doDCAIPW,
            doManuTMLE=doManuTMLE, doShortTMLE = doShortTMLE,
-           doDCTMLE=doDCTMLE,
+           doDCTMLE=doDCTMLE,doGComp=doGComp,
            num_cf=num_cf,
            #control=list()
-           control=control
+           control=control,
+           parallel=parallel.for.DC
     )
   }
   toc()

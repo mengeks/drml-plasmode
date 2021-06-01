@@ -1,9 +1,50 @@
-{\rtf1\ansi\ansicpg1252\cocoartf2513
-\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
-{\colortbl;\red255\green255\blue255;}
-{\*\expandedcolortbl;;}
+{\rtf1\ansi\ansicpg1252\cocoartf2580
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\froman\fcharset0 Times-Roman;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
 \margl1440\margr1440\vieww10800\viewh8400\viewkind0
 \pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
 
-\f0\fs24 \cf0 submitted092820\'97Hard Simulation\
-submitted092920\'97Interaction}
+\f0\fs24 \cf0 \
+\
+no4correct \'97 no4:   Y ~ A +  ( 
+\f1 \cf2 \expnd0\expndtw0\kerning0
+VAR_1 + VAR_2 + VAR_5 + VAR_18 + VAR_217 )^2 + VAR_1 + ... + VAR_40
+\f0 \cf0 \kerning1\expnd0\expndtw0 \
+No4 \'97  Y ~ A +  ( 
+\f1 \cf2 \expnd0\expndtw0\kerning0
+VAR_1 + VAR_2 + VAR_5 + VAR_18 + VAR_217 )^2 + VAR_1 + ... + VAR_40, 
+\f0 \cf0 \kerning1\expnd0\expndtw0 estimate 
+\f1 \cf2 \expnd0\expndtw0\kerning0
+OR, PS using only the first order terms/no interactions
+\f0 \cf0 \kerning1\expnd0\expndtw0 \
+no4partial1 \'97  Simulation model: no4;    estimation model: Y ~ A +  ( 
+\f1 \cf2 \expnd0\expndtw0\kerning0
+VAR_1   + VAR_2 + VAR_5 + VAR_217 )^2 + ramd(10, VAR_1 + ... + VAR_40)
+\f0 \cf0 \kerning1\expnd0\expndtw0 \
+no4partial2 \'97  Y ~ A +  ( 
+\f1 \cf2 \expnd0\expndtw0\kerning0
+VAR_1 + VAR_2 + VAR_5 + VAR_18 + VAR_217 )^2 +  VAR_1 + ... + VAR_40 + rand(10, VAR_300 + ... + VAR_320)
+\f0 \cf0 \kerning1\expnd0\expndtw0 \
+\
+no4correct\'97A.cor\
+No4\'97A.no.int\
+No4partial1\'97A.less.1st\
+\
+No5-B\
+No5correct-B.cor\
+\
+no2\'97C.bad          #2 Interaction\
+no2partial \'97 C.part.       #2 Interaction, estimate using  Y ~ A +  ( VAR_1 + VAR_2 + VAR_5 + VAR_18 + VAR_217 )^2 + A:VAR_1 + A:VAR_217\
+no2correct \'97C.cor        #2 Interaction, estimate using correct specification\
+\
+\
+\
+Not in use:\
+submitted092820\'97#1 Hard Simulation\
+\pard\tx720\tx1440\tx1594\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 submitted092920\'97#2 Interaction\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 submitted100120\'97#3 Interaction except interaction on A\
+submitted100220\'97#4 Interaction except interaction on A + X2:40\
+no15--# 1, handpick regression variables}
