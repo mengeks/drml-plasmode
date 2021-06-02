@@ -72,7 +72,6 @@
            doManuTMLE=doManuTMLE, doShortTMLE = doShortTMLE,
            doDCTMLE=doDCTMLE,doGComp=doGComp,
            num_cf=num_cf,
-           #control=list()
            control=control,
            parallel=parallel.for.DC
     )

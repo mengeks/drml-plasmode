@@ -1,25 +1,4 @@
-# DEBUG. Initiate Within function variables
-# plas <- make.set(ver=data.ver, size = size, plas = plas_org, use.subset=F)
-# plas.formula <- make.formula("Y5", "A1", ver=data.ver)
-# outForm <- plas.formula$outForm
-# expForm <- plas.formula$expForm
-
-
-# formulaOut = as.formula(outForm)
-# objectOut = NULL
-# formulaExp = as.formula(expForm)
-# objectExp = NULL
-# data = plas
-# idVar = "id"
-# effectOR = Effect_Size
-# MMOut = 1
-# MMExp = 1
-# nsim = Nsets
-# size = nrow(plas)
-# exposedPrev = NULL
-
-
-# set.seed(plas.seed)
+# Function to produce plasmode dataset
 
 PlasmodeContNew <- function(formulaOut=NULL, objectOut=NULL,formulaExp=NULL,objectExp=NULL, data, idVar,
                               effectOR =1, MMOut=1,MMExp=1, nsim, size, eventRate=NULL, exposedPrev=NULL,

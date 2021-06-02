@@ -3,8 +3,6 @@ expit <- function(x){
   1/(1+exp(-x))
 }
 
-#expForm <- "A ~ L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
-#outForm <- "Y ~ A + L0.a + L0.b + L0.c + L0.d + L0.e + L0.f + L0.g + L0.h + L0.i + L0.j + L0.k"
 ##########################################
 # Initialize necessary parameters for estimator
 ##########################################
@@ -63,11 +61,8 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     suppressMessages(learnPS <- SuperLearner(Y = exp_vec, X = exp_pred_mat, 
                                              SL.library = aipw_lib, family = binomial(),
                                              cvControl=control))
-    # SuperLearner(Y=as.matrix(data[, exposure])[,1], X=data.frame(data[, covarsT]), 
-    #              family=binomial(), SL.library=learners, cvControl=control)
+
     pred_ps <- c(learnPS$SL.predict)
-    # ptmps <- proc.time()
-    # print(paste0("pscore fitting takes ", round((ptmps - ptm0)[3],3), "s"))
 
     out_pred_mat <- model.matrix(object = as.formula(outForm), data=gset)[,-1]
     out_pred_mat <- data.frame(out_pred_mat)
@@ -76,8 +71,7 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     out_x0_mat[exposure] <- rep(0, length(exp_vec))
     
     psm <- SuperLearner(Y = as.matrix(out_vec), X = out_pred_mat, SL.library = aipw_lib,cvControl=control)
-    # ptmor <- proc.time()
-    # print(paste0("OR fitting takes ", round((ptmor - ptmps)[3],3), "s"))
+
     pred_x1 <- predict(psm , newdata = out_x1_mat)$pred
     pred_x0 <- predict(psm , newdata = out_x0_mat)$pred
     
@@ -85,8 +79,7 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     
     
     aipw <- RCAL::ate.aipw(y = gset$Y, tr = gset$A, mfp = cbind(gset$ps_u, gset$ps_t), mfo = cbind(gset$pred_u, gset$pred_t))
-    # ptmrcal <- proc.time()
-    # print(paste0("RCAL takes ", round((ptmrcal - ptmor)[3],3), "s"))
+
     ATE <- aipw$diff.est[2]
     SE <- sqrt(aipw$diff.var[2])
     TYPE <- "AIPW"
@@ -132,21 +125,6 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     gset <- gset %>% mutate(wt2 = case_when(wt > quantile(gset$wt, 0.95) ~ quantile(gset$wt, 0.95),
                                             wt < quantile(gset$wt, 0.05) ~ quantile(gset$wt, 0.05),
                                             T ~ wt)) # Truncated IPTW
-    # hist(denom_fit$fitted.values)
-    # summary(denom_fit$fitted.values)
-    # hist(gset$wt)
-    # hist(gset$wt2)
-    # plot(gset$A, gset$denom)
-    # # mis-classification rate
-    # sum(gset$A*(gset$denom<0.9999) + (1-gset$A)*(gset$denom>0.0001))/length(gset$A)
-    # boxplot(gset$A*num/gset$denom)
-    # summary(gset$A*num/gset$denom)
-    # cbind(gset$A, gset$denom)
-    # boxplot((1-gset$A)*num/(1-gset$denom))
-    # summary((1-gset$A)*num/(1-gset$denom))
-    # model_glm <- glm(data = gset, weight = wt2,
-    #                  formula = as.formula(outForm),
-    #                  family = "gaussian")
     require("survey")
     model_glm <-(svyglm(Y ~ A, design = svydesign(~ 1, weights = ~ wt2,
                                                   data = gset)))
@@ -170,29 +148,20 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
     
     denom_fit <- cv.glmnet(y=y_exp, x=x_exp,
                            family = "binomial")
-    # hist(expit(predict(denom_fit, newx = x_exp, s="lambda.min")))
-    # quantile(expit(predict(denom_fit, newx = x_exp, s="lambda.min")), c(0.05,0.95))
-    # fitted.values(denom_fit,s=lambda_min)
-    # hist(denom_fit$fitted.values)
-    # quantile(denom_fit$fitted.values, c(0.05,0.95))
+
     gset <- gset %>% mutate(denom = expit(predict(denom_fit, newx = x_exp, s="lambda.min"))) %>%
       mutate(wt = if_else(A == 1, num/denom, (1-num)/(1-denom))) #Stabilized IPTW
-    # hist(gset$wt)
-    #  quantile(gset$wt, c(0.05,0.95))
+
     
     gset <- gset %>% mutate(wt2 = case_when(wt > quantile(gset$wt, 0.95) ~ quantile(gset$wt, 0.95),
                                             wt < quantile(gset$wt, 0.05) ~ quantile(gset$wt, 0.05),
                                             T ~ wt)) # Truncated IPTW
-    # plot(gset$A, gset$denom)
-    # hist(gset$wt)
-    # hist(gset$wt2)
     
     x <- model.matrix(as.formula(outForm), data=gset)[,-1]
     y <- gset$Y
     
     model_fit <- cv.glmnet(y=y, x=x,family = "gaussian")
     y.pred <- predict(model_fit, newx = x, s="lambda.min")
-    # hist(y.pred)
     
     lambda_min <- model_fit$lambda.min
     coefficients <- as.matrix(coef(model_fit,s=lambda_min))

@@ -54,9 +54,6 @@ make.formula <- function(outVar = "Y", expVar = "A", ver = "FULL",
 
     return(list(outForm=outForm,
                 expForm=expForm))
-    # return(list(outForm=outForm,
-    #             expForm=expForm,
-    #             plas=plas))
   }
   else{
     expForm <- "A ~ C1 + C2 + C3 + C4 + C5"

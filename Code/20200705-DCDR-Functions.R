@@ -1,12 +1,5 @@
 # # Newey and Robins DCDR
-# 
-# data <- tset # DEBUG
-# learners <- aipw_lib # DEBUG
-# (covarsT <- all.vars(as.formula(expForm))[-1]) # DEBUG
-# control <- SuperLearner.CV.control(V=2) # DEBUG
-# (covarsO <- all.vars(as.formula(outForm))[-1]) # DEBUG
-# outcome <- as.character(as.formula(outForm)[[2]]) # DEBUG
-# exposure <- as.character(as.formula(expForm)[[2]]) # DEBUG
+# # Code modified from Zivich and Breskin 2020
 
 # Function that does DCDR using input data and super learner with a given seed
 DCDR_Single <- function(data, exposure, outcome, covarsT, covarsO, learners, control, parallel=T){

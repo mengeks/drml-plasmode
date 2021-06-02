@@ -27,12 +27,12 @@ library(doRNG)
 library(foreach)
 library(randomForest)
 rm(list = ls())
-cluster <- T; is.timing <- T
+
+cluster <- T;  # Whether we want to run on cluster or the local machine
+is.timing <- T # Whether we want to record the run time
 parallel.for.DC <- F # This is variable is controlling whether we use parallelism in DC_single fitting
 N_sims <- 100# this should <= plas_sim_N
 if (cluster == T){
-  # path <- "/n/holyscratch01/murphy_lab/Users/xmeng/submitted100220"
-  # setwd(paste0(path))
   args = commandArgs(TRUE)
   print(args)
   est.method <- args[[1]];
@@ -44,7 +44,6 @@ if (cluster == T){
   doManuTMLE=0; doDCTMLE=0; doGComp=0
   num_cf=5
   doShortTMLE = 0
-  #control=list()
   control=SuperLearner.CV.control(V=2)
   if (est.method=="non-DC"){
     doIPW = 1; doLASSO=1;
@@ -74,8 +73,6 @@ if (cluster == T){
   est.method <- ''
   no_cores <- detectCores(all.tests = T) - 2
   setwd("~/Desktop/HuangGroup/cvtmle_plasmode/Code/cluster/no4correct")
-  # path <- "~/Desktop/HuangGroup/cvtmle_plasmode"
-  # setwd(paste0(path,"/Code"))
 }
 
 set.seed(42782)
@@ -96,7 +93,7 @@ print(no_cores)
   plas.seed <- 1111
   
   ########
-  # parameters for plasmode
+  # parameters for plasmode simulation
   #######
   # p=331 for the whole set 
   data.ver <- "FULL"
@@ -114,7 +111,7 @@ print(no_cores)
   
   
   ########
-  # parameters for 5 var, 5var.then.plas
+  # parameters for the simulation in Section 3
   #######
   # Nsets <- 10000
   # Nsamp <- 3000
@@ -135,7 +132,8 @@ if (sims.ver == "plas"|sims.ver == "5var.then.plas"){
 }
 
 # Plot the regression coefficient in Plasmode simulation
-# plot(plas_sims$TrueOutBeta)
+plot(plas_sims$TrueOutBeta)
+# Output the OR and PS model used for Plasmode
 print("Simulation: ")
 print(paste0("OR form: ",plas_sims$outForm))
 print(paste0("PS form: ",plas_sims$expForm))
@@ -147,40 +145,38 @@ print(paste0("PS form: ",plas_sims$expForm))
 {
   # DC implementation
   source("20200705-DCDR-Functions.R")
-  # getRES function is now relocated to a separate file (20200720-Algos-code.R)
+  # getRES function
   source("20200720-Algos-code.R")
-
-
-
-# specify which set of learners for SL
-if (non.par == T){
-  ### NON-SMOOTH
-  short_tmle_lib <- SL_param_list
-  tmle_lib <- lrnr_SL
-  aipw_lib <- SL.lib
-}
-else{
-  # SMOOTH
-  short_tmle_lib <- SL_list
-  tmle_lib <- lrnr_SL_param
-  aipw_lib <- SL.param
-}
-
-N_sims<- 100
-# aipw_lib <- c("SL.glmnet")
-
-# errorhandling="stop"
-errorhandling="remove"
-
-if (cluster != T){
-  doIPW = 0; doLASSO=0;
-  doAIPW=0; doDCAIPW=0
-  doManuTMLE=1; doDCTMLE=0
-  num_cf=5; doGComp=0
-  doShortTMLE = 0
-  #control=list()
-  control=SuperLearner.CV.control(V=2)
-}
+  
+  
+  
+  # specify which set of learners for SL
+  if (non.par == T){
+    ### NON-SMOOTH
+    short_tmle_lib <- SL_param_list
+    tmle_lib <- lrnr_SL
+    aipw_lib <- SL.lib
+  }
+  else{
+    # SMOOTH
+    short_tmle_lib <- SL_list
+    tmle_lib <- lrnr_SL_param
+    aipw_lib <- SL.param
+  }
+  
+  N_sims<- 100
+  
+  # errorhandling="stop"
+  errorhandling="remove"
+  
+  if (cluster != T){
+    doIPW = 0; doLASSO=0;
+    doAIPW=0; doDCAIPW=0
+    doManuTMLE=1; doDCTMLE=0
+    num_cf=5; doGComp=0
+    doShortTMLE = 0
+    control=SuperLearner.CV.control(V=2)
+  }
 }
 
 
@@ -204,7 +200,6 @@ print(length(boot1))
 if (is.timing == F){
   save(boot1, file=paste("./RDataFiles/result-",est.method,"-",args[[2]],".RData",sep="")) 
 }else{
-  # est.method = "IPW"; args =list("", "par") #DEBUG
   save(boot1, file=paste("./RDataFiles/result-",est.method,"-",args[[2]],"-timing.RData",sep=""))
   tm <- round((ptm1 - ptm0)[3],2)
   tm <- data.frame(tm)

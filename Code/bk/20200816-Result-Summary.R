@@ -32,12 +32,6 @@ summarise.res <- function(boot1, wrt="all", Effect_Size=6.6){
   }
   
   
-  # out_path <- "/Users/garethalex/Desktop/HuangGroup/cvtmle_plasmode/Data/"
-  # boot1.out <- data.frame(matrix(unlist(tmp),ncol=3))
-  # fac.to.num <- function(f) as.numeric(levels(f))[f]
-  # boot1.out[,1:2] <- lapply(boot1.out[,1:2], fac.to.num)
-  # boot1.out %>% group_by(X3)
-  # pos <- max(sim_corr1$ub) 
   
   
   # Visualize
@@ -48,18 +42,6 @@ summarise.res <- function(boot1, wrt="all", Effect_Size=6.6){
     # geom_hline(data = filter(sim_corr1, substring(TYPE,1,3) %in% c("AIP", "GLM")), aes(yintercept = mean(ATE)), linetype = "dashed") +
     # geom_hline(data = filter(sim_corr1, substring(TYPE,1,2) == "CV"), aes(yintercept = mean(ATE)), linetype = "dotted") +
     geom_hline(data = sim_corr1, aes(yintercept = mean(ATE)), linetype = "dotted") +
-    # geom_text(data = filter(sim_corr1, substring(TYPE,1,3) %in% c("AIP", "GLM")),
-    #           aes(N_boot, pos, hjust = "right",
-    #               label = paste("\n\nMean bias = ", as.character(round(mean(bias), 3)),
-    #                             "\nMedian bias = ", as.character(round(median(bias), 3)),
-    #                             "\nMSE = ", as.character(round(var(ATE) + mean(bias)^2, 3)),
-    #                             "\nCoverage = ", as.character(round(sum(lb <= Effect_Size & ub >= Effect_Size)/N_boot, 3)) ))) +
-    # geom_text(data = filter(sim_corr1, substring(TYPE,1,2) == "CV"),
-    #           aes(N_boot, pos, hjust = "right",
-    #               label = paste("\n\nMean bias = ", as.character(round(mean(bias), 3)),
-    #                             "\nMedian bias = ", as.character(round(median(bias), 3)),
-    #                             "\nMSE = ", as.character(round(var(ATE) + mean(bias)^2, 3)),
-  #                             "\nCoverage = ", as.character(round(sum(lb <= Effect_Size & ub >= Effect_Size)/N_boot, 3)) ))) +
   labs(x = "iteration", color = "Estimator") +
     facet_wrap(~TYPE) +
     theme(legend.position = "none")
