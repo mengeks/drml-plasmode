@@ -4,6 +4,9 @@ Code to reproduce results in the paper [Doubly robust, machine learning effect e
 
 Xiang Meng 2021.06.11
 
+
+[![DOI](https://zenodo.org/badge/373040701.svg)](https://zenodo.org/badge/latestdoi/373040701)
+
 ## 1. Code Structure
 * [2020309-Plasmode_Sim_CV-TMLE.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/2020309-Plasmode_Sim_CV-TMLE.R): Master code to first generate dataset and then produce estimation. It has dependencies on all other codes. 
 * [20200803-Sims-Function.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200803-Sims-Function.R): Code to generate simulation dataset and plasmode dataset
