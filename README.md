@@ -1,25 +1,23 @@
-# cvtmle_plasmode
-Diagnostics of doubly-robust estimators in real world (plasmode-simulated) finite samples
+# Code for the paper "Doubly robust, machine learning effect estimation in real-world clinical sciences: A practical evaluation of performance in molecular epidemiology cohort settings"
 
-Current best practices for quantitative causal inference recommend machine learning (non-parametric/non-smooth classifers) of nuisance parameters be used with care: namely, using doubly robust estimators (treatment and outcome models; Naimi, Mishler, Kennedy 2020) and cross-fitting (parameter and standard error estimation on a separate set than the one used for nuisance function estimation; Zivich & Breskin 2020). Moreover, despite reasonably faster convergence rates for these doubly robust estimators, small sample sizes may be insufficient to guarantee appropriate coverage properties regardless of the estimators implemented (Benkeser 2017, Rotnitzky 2019). 
+Code to reproduce results in the paper [Doubly robust, machine learning effect estimation in real-world clinical sciences: A practical evaluation of performance in molecular epidemiology cohort settings](https://arxiv.org/abs/2105.13148) by Xiang Meng, Jonathan Huang
 
-Most importantly, existing simulation studies use fairly simple confounding structures (Naimi 2020) or large sample sizes (Bahamyirou 2018, Zivich 2020) which may demonstrate overly optimistic performance relative to the real world use case of complex confounding, practical positivity violations, and small samples. Here we demonstrate performance in closer to real-world conditions, notably by applying estimators to a structure-preserving "plasmode" dataset (where covariate data are retained but treatment and outcome values reassigned to force a known parameter estimate across bootstrapped data sets) drawn from an existing longitudinal cohort study (N = 1178; 331 covariates). One past effort by Bahamyirou, et al. (2018) focusing on positivity violations in propensity score estimation utilized a similar approach (Bootstrap Diagnostic Test) but on large samples and fewer, simple covariates.
+Xiang Meng 2021.06.11
 
-Overall objectives:
-1. Reproduce earlier findings showing that optimal bias and coverage is provided by cross-fit DR (TMLE & AIPW) estimators when the data sets are large (N > 2000) and the confounding sets are simulated simply (with or without misspecfication)
-2. Show that this does not hold when applied to "real world" data which contain more complex covariation and likelihood for positivity violations using "plasmode" (structure-preserving) simulation based on an available cohort dataset (N <= 1178; 16 or 331 covariates)
-3. Provide some guidance on diagnotics (using plasmode) and best practices in these real-world sets
 
-What has been done:
-1. Function to sample plasmode data sets was created based on existing (non-functional) "plasmode" package (0200226-PlasmodeCont_Revised.R) 
-2. Simulations demonstrating good performance of TMLE / AIPW in an "ideal setting" (e.g. 5 covariates including non-linearities, N = 3000, 10k bootstrap samples); code draws simulations, fits AIPW, CV-TMLE, and IPW+GLM models, estimates contrasts, computes bias and coverage (20200304-Basic_Sim_CV-TMLE.R)
-3. Some simulations for the "real world" setting (16 or 331 covariates; N = 1178) varying the number of bootstrapped sets (200-1000) and fitting AIPW, CV-TMLE, and IPW+GLM using smooth (glm, elastic net, polynomial splines) and non-smooth (random forest, xgboost, single-layer neural net) estimators of nuisance parameters, computing bias and coverage (20200309-Plasmode_Sim_CV-TMLE.R)  
+[![DOI](https://zenodo.org/badge/373040701.svg)](https://zenodo.org/badge/latestdoi/373040701)
 
-Preliminary findings:
-We reproduce the finding that cross-fit, doubly robust estimators do have reduced bias and improved coverage to simple regression in simple confounding cases and larger datasets. In plasmode simulated data with slightly more covariates (N = 16) cross-fit AIPW and TMLE work well with nuisance parameters estimated with smooth functions (glm, elastic net, polynomial splines) but, more importantly, are biased with poor coverage if non-parametric classifiers are used (e.g. random forest, xgboost). This was true even when following best-practices for a moderate sized sample (N = 1178). A simple IPW+GLM performed just as well. In the case of high-dimensional covariates, where some variable selection / penalization is necessary (i.e. machine learning) non-smooth nuisance estimation was able to recover the target contrast, but coverage remained suboptimal.  
+## 1. Code Structure
+* [2020309-Plasmode_Sim_CV-TMLE.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/2020309-Plasmode_Sim_CV-TMLE.R): Master code to first generate dataset and then produce estimation. It has dependencies on all other codes. 
+* [20200803-Sims-Function.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200803-Sims-Function.R): Code to generate simulation dataset and plasmode dataset
+* [20200226-PlasmodeCont_Revised.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200226-PlasmodeCont_Revised.R): Function to generate Plasmode dataset
+* [20200904-run-sim-code.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200904-run-sim-code.R): Code to parallelize estimation. 
+* [20200720-Algos-code.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200720-Algos-code.R): Function that contains all estimators
+* [20200705-DCDR-Functions.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200705-DCDR-Functions.R): Function for Double Cross-Fit which is modified from Breskin and Zivich (2020).
+* [20200816-Result-Summary.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/20200816-Result-Summary.R): A script containing all summary functions.
+* [3.1 Single-Summary.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/3.1%20Single-Summary.R): Code that produces summary for a single result file (need to manually change path)
+* [3.Summary.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/3.Summary.R): Code that produces a list of summaries and plots for the paper.
+* [OutputCoeff.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/OutputCoeff.R): Code to produce the actual simulation coefficients as shown in the appendix.
 
-To-Do (as of 9 June 2020):
-1. Verify code for plasmode simulation, "ideal setting," and "real world" setting performance
-2. Optimize the CV-AIPW in some way (otherwise ensemble learner must be fit 3 times per run)
-3. Complete simulations for 200 and 500 samples (perhaps do not need to vary the number of bootstraps used to estimate -- not much variation in this regard)
-4. Complete interpretation and write-up
+## 2. Results in Paper and Corresponding Code
+As briefly mentioned above, parameters in [2020309-Plasmode_Sim_CV-TMLE.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/2020309-Plasmode_Sim_CV-TMLE.R) controls all the simulations. To run for different simulation scenario, one should just change parameters here. eg. "idx.handpick" is the indices of covariates picked; "interact" means whether we add first order interactions between covariates; "interact.w.exp" means we add first order interactions between covariates and the exposure variable. 
