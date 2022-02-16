@@ -79,7 +79,6 @@ function(input, output) {
   out.Form.check <- reactive({
     ds <- read.csv(file = path(), header=TRUE, stringsAsFactors=FALSE)
     if (prod(all.vars(expr = as.formula(input$outForm)) %in% colnames(ds)) == 0){
-      # "Error: SIMULATION Outcome Model must only contain variables in the dataset. Please re-enter."
       tmp <- all.vars(expr = as.formula(input$outForm))
       to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in SIMULATION Outcome 
              Model. Must only contain variables in the dataset. Please re-enter.")
@@ -93,9 +92,9 @@ function(input, output) {
   
   exp.Form.est.check <- reactive({
     ds <- read.csv(file = path(), header=TRUE, stringsAsFactors=FALSE)
-    # req(prod(all.vars(expr = as.formula(input$expForm)) %in% colnames(ds)) == 1)
+    
     if (prod(all.vars(expr = as.formula(input$expForm.est)) %in% colnames(ds)) == 0){
-      # "Error: ESTIMATION Propensity Score model must only contain variables in the dataset. Please re-enter."
+      
       tmp <- all.vars(expr = as.formula(input$expForm.est))
       to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in ESTIMATION Propensity Score 
              model. Must only contain variables in the dataset. Please re-enter.")
@@ -110,7 +109,7 @@ function(input, output) {
   out.Form.est.check <- reactive({
     ds <- read.csv(file = path(), header=TRUE, stringsAsFactors=FALSE)
     if (prod(all.vars(expr = as.formula(input$outForm.est)) %in% colnames(ds)) == 0){
-      # "Error: ESTIMATION Outcome Model must only contain variables in the dataset. Please re-enter."\
+      
       tmp <- all.vars(expr = as.formula(input$outForm.est))
       to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in ESTIMATION Outcome 
              Model. Must only contain variables in the dataset. Please re-enter.")
@@ -163,7 +162,7 @@ function(input, output) {
                              outForm = input$outForm.est
       )
     }
-    # Effect_Size <<- 6.6
+    
     ATE.one.time <<- as.numeric(one.time.est[1,1])
     SE.one.time <<- as.numeric(one.time.est[1,2])
     
@@ -184,7 +183,7 @@ function(input, output) {
     RegEff <<- sims.obj$RegEff
     Effect_Size <<- RegEff
     N_sims<- reactive({input$obs})
-    # set.seed(42782)
+    
     
     
     
@@ -208,7 +207,7 @@ function(input, output) {
           plas_data <- data.frame(id = plas_sims$Sim_Data[i],
                              A = plas_sims$Sim_Data[i + (2*plas_sim_N)],
                              Y = plas_sims$Sim_Data[i + plas_sim_N])
-          # print(colnames(plas_data))
+          
           colnames(plas_data) <- c("id", "A", "Y")
           
           set1 <- left_join(as_tibble(plas_data), as_tibble(plas.copy),by="id")
@@ -253,7 +252,7 @@ function(input, output) {
     })
     
     summaryTable <- reactive({
-      # give.summary.res(res.path, "med_bias")
+      
       summarise.res(boot1=boot1.val(), Effect_Size=Effect_Size)
     })
     
@@ -267,11 +266,7 @@ function(input, output) {
     output$res.text.1 <- renderText({
       tbl <- summaryTable()
       tbl <- round(tbl[,2:ncol(tbl)],3)
-      # paste0("<b>EMPIRICAL RESULTS:</b> Using <b>", est.mtd(),"</b> on the <b>OBSERVED</b> data, 
-      #  we estimate an average treatment effect of <b>", round(Effect_Size,3),  "</b> with a 95% confidence interval of <b>(",
-      #  round(Effect_Size-1.96*SE.one.time,3),",",round(tbl$mu_ATE+1.96*SE.one.time,3),")</b>. 
-      # This is an unbiased estimate of the ATE if standard causal inference assumptions
-      #        are fulfilled (consistency, exchangeability, positivity, and correct model).")
+      
       paste0("<p> <b>EMPIRICAL RESULTS:</b> Using <b>", est.mtd(),"</b> on the <b>OBSERVED</b> data, 
        we estimate an average treatment effect of <b>", round(ATE.one.time,3),  "</b> with a 95% confidence interval of <b>(",
              round(ATE.one.time-1.96*SE.one.time,3),",",round(ATE.one.time+1.96*SE.one.time,3),")</b>. 
@@ -295,12 +290,7 @@ function(input, output) {
       of <b>", round((tbl$med_ATE-Effect_Size),2), "</b>. Corresponding confidence intervals covered
       the true ATE in <b>", round(tbl$coverage*100,2) ,"%</b> of simulations.
              This performance should be compared to other estimation methods. </p>")
-      # paste0("Thus, we used the observed data to conduct <b>",input$obs,"</b> plasmode simulations
-      #        based on a user-defined causal structure and a fixed effect size <b>",round(Effect_Size,3), "</b>.
-      #        There appears to be an median bias of <b>", round((tbl$med_ATE-Effect_Size)/tbl$med_SE,2), "%</b> and confidence intervals
-      #        covered the true ATE in <b>", round(tbl$coverage*100,2) ,"%</b> of simulations.
-      #        This performance should be compared to other estimation methods.")
-      # round((1-(tbl$med_ATE)/RegEff)*100,2)
+      
     })
   })
 
