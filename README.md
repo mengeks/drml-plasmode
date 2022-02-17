@@ -21,3 +21,26 @@ Xiang Meng 2021.06.11
 
 ## 2. Results in Paper and Corresponding Code
 As briefly mentioned above, parameters in [2020309-Plasmode_Sim_CV-TMLE.R](https://github.com/mengeks/drml-plasmode/blob/master/Code/2020309-Plasmode_Sim_CV-TMLE.R) controls all the simulations. To run for different simulation scenario, one should just change parameters here. eg. "idx.handpick" is the indices of covariates picked; "interact" means whether we add first order interactions between covariates; "interact.w.exp" means we add first order interactions between covariates and the exposure variable. 
+
+
+## 3. The REFINE2 Shiny app
+The REFINE2 tool allows the analyst to check whether the chosen effect estimation strategy, with or without the use of machine learning algorithms, will reliably estimate an unbiased average treatment effect (ATE) and appropriate confidence intervals given their specific dataset and user-provided parameters. Namely, the user provides: 
+* the dataset  
+* number of simulation draws
+* **Simulation** models representing the "true" relationships between treatment, outcome, and covariates (in R syntax)
+* **Estimation** models representing how the effect would be estimated
+* chosen estimator (*e.g.* IPW, DC-TMLE)
+* library used to fit the estimator (smooth, non-smooth)
+
+Allowing the user to specify both Simulation and Estimator models ensures maximum flexibility on degree of misspecification. For example, variables could be used to simulate the truth but be omitted or mismeasured in the estimation model to test sensitivity. Using the exact same Simulation and Estimation models will test the finite sample / bias convergence properties of the algorithms on the dataset at hand.
+
+How to use the app?
+1.	Clone [the folder](https://github.com/mengeks/drml-plasmode/tree/master/REFINE2) on your local machine
+2.	Convert your data set as a CSV file. Make sure to name the outcome as Y and the binary treatment as A
+3.	Make sure you installed the package “Shiny” in R
+4.	In R session, run shiny::runApp(PATH), where PATH is the path of the folder
+ Eg: shiny::runApp("~/Desktop/HuangGroup/cvtmle_plasmode/Code/REFINE2")
+4.	Set the “Path of the data” to your data path
+5.	Set 4 models and other parameters
+  Models should in format of R formula: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/formula.html
+6.	Click the “Run” button
