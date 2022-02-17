@@ -1,6 +1,6 @@
 # Code for the paper "Doubly robust, machine learning effect estimation in real-world clinical sciences: A practical evaluation of performance in molecular epidemiology cohort settings"
 
-Code to reproduce results in the paper [Doubly robust, machine learning effect estimation in real-world clinical sciences: A practical evaluation of performance in molecular epidemiology cohort settings](https://arxiv.org/abs/2105.13148) by Xiang Meng, Jonathan Huang
+Code to reproduce results in the paper [REFINE2: A tool to evaluate real-world performance of machine-learning based effect estimators for molecular and clinical studies](https://arxiv.org/abs/2105.13148) by Xiang Meng, Jonathan Huang
 
 Xiang Meng 2021.06.11
 
