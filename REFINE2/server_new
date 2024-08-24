@@ -2,6 +2,7 @@ library(shiny)
 
 list.of.packages <- c("shiny","mgcv","nlme","glm2","polspline",  "doRNG","doParallel",
                       "SuperLearner","gam","foreach","splines","nnls",
+                      "randomForest", "xgboost", "RCAL",
                       "table1","readxl","haven","dplyr","purrr","readr","tidyr",       
                       "tibble","tidyverse","ggplot2")
 
