@@ -34,6 +34,23 @@ The REFINE2 tool allows the analyst to check whether the chosen effect estimatio
 
 Allowing the user to specify both Simulation and Estimator models ensures maximum flexibility on degree of misspecification. For example, variables could be used to simulate the truth but be omitted or mismeasured in the estimation model to test sensitivity. Using the exact same Simulation and Estimation models will test the finite sample / bias convergence properties of the algorithms on the dataset at hand.
 
+## 4. R Package Dependencies
+
+REFINE2 automatically installs required dependencies when first launched. Key packages include:
+
+**Core Dependencies:**
+- `shiny` - Web application framework
+- `SuperLearner` - Ensemble learning (includes `glmnet`, `randomForest`, `xgboost`, `polspline`)
+- `tidyverse` - Data manipulation and visualization (includes `dplyr`, `ggplot2`, `readr`, etc.)
+
+**Additional Packages:**
+- `mgcv`, `splines` - Statistical modeling
+- `doParallel`, `foreach` - Parallel computing
+- `readxl`, `haven` - Data import
+- `table1` - Descriptive statistics
+
+All dependencies are checked and installed automatically on first run.
+
 How to use the app?
 1.	Clone [the folder](https://github.com/mengeks/drml-plasmode/tree/master/REFINE2) on your local machine
 2.	Convert your data set as a CSV file. Make sure to name the outcome as Y and the binary treatment as A

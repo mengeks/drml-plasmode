@@ -21,12 +21,31 @@ summarise.res <- function(boot1, wrt="all", Effect_Size=6.6){
   
   #write_csv(plas_corr1, paste0(out_path, Sys.Date(), "-plasmode_sim_CV-TMLE_GLM_IPW_1000.csv"))
   
-  sim_res <- sim_corr1 %>% group_by(TYPE) %>% 
-    summarize(b=length(ATE), med_t=median(t), mu_ATE = mean(ATE), med_ATE = median(ATE), 
-              mu_SE = mean(SE), med_SE = median(SE), 
-              mu_bias = mean(bias), med_bias = median(bias), 
-              var = var(ATE), MSE = var + mu_bias^2,
-              coverage = sum(lb <= Effect_Size & ub >= Effect_Size)/N_boot)
+  # sim_res <- sim_corr1 %>% group_by(TYPE) %>% 
+  #   summarize(b=length(ATE), med_t=median(t), mu_ATE = mean(ATE), med_ATE = median(ATE), 
+  #             mu_SE = mean(SE), med_SE = median(SE), 
+  #             mu_bias = mean(bias), med_bias = median(bias), 
+  #             var = var(ATE), MSE = var + mu_bias^2,
+  #             coverage = sum(lb <= Effect_Size & ub >= Effect_Size)/N_boot)
+  sim_res <- sim_corr1 %>% group_by(TYPE) %>%
+    summarize(
+      b = length(ATE),
+      mu_ATE = mean(ATE),
+      mcse_ATE = sd(ATE)/sqrt(n()),
+      
+      mu_SE = mean(SE),
+      mcse_SE = sd(SE)/sqrt(n()),
+      
+      mu_bias = mean(bias),
+      mcse_bias = sd(bias)/sqrt(n()),
+      
+      var = var(ATE),
+      MSE = var + mu_bias^2,
+      mcse_MSE = sd((ATE - Effect_Size)^2) / sqrt(n()),
+      
+      coverage = mean(lb <= Effect_Size & ub >= Effect_Size),
+      mcse_coverage = sqrt(coverage * (1 - coverage) / n())
+    )
   if (wrt !="all"){
     sim_res <- sim_res %>%  filter(TYPE %in% wrt)
   }

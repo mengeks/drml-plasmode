@@ -3,11 +3,20 @@ library(shiny)
 list.of.packages <- c("shiny","mgcv","nlme","glm2","polspline",  "doRNG","doParallel",
                       "SuperLearner","gam","foreach","splines","nnls",
                       "Plasmode","table1","readxl","haven","dplyr","purrr","readr","tidyr",       
-                      "tibble","tidyverse","ggplot2")
+                      "tibble","tidyverse","ggplot2",
+                      "here",
+                      "glmnet",
+                      'arm', 'lme4', 'twang', 'gbm', 'latticeExtra', 'epiDisplay' # Plasmode dependencies
+                      )
 
 install.packages(list.of.packages[which(
   sapply(list.of.packages, function(x) {nzchar(system.file(package = x))})==F
   )])  
+
+# install Plasmode
+if (!requireNamespace("Plasmode", quietly = TRUE)) {
+  install.packages(here::here("REFINE2/Plasmode_0.1.0.tar.gz"), repos = NULL, type="source")
+}
 
 function(input, output) {
   library(tidyverse)
@@ -24,7 +33,8 @@ function(input, output) {
   library(polspline)
   path <- reactive({input$path})
   registerDoParallel(cores= detectCores(all.tests = T) - 2)
-  num_cf=5
+  random_seed <- reactive({input$random_seed})
+  num_cf <- reactive({input$num_cf})
   control=SuperLearner.CV.control(V=2)
   
   est.mtd <-  reactive({input$mtd})
@@ -122,6 +132,7 @@ function(input, output) {
   })
   
   observeEvent(input$run, {
+    set.seed(random_seed())
     expForm <- reactive({input$expForm})
     outForm <- reactive({input$outForm})
     ds <- read.csv(file = path(), header=TRUE, stringsAsFactors=FALSE)
@@ -154,7 +165,7 @@ function(input, output) {
                              doDCAIPW=doDCAIPW(),
                              doManuTMLE=doManuTMLE(),
                              doDCTMLE=doDCTMLE(),doGComp=doGComp(),
-                             num_cf=num_cf,
+                             num_cf=num_cf(),
                              #control=list()
                              control=control,
                              parallel=F,
@@ -195,26 +206,31 @@ function(input, output) {
     N_sims <- N_sims()
     plas.copy <- plas %>% dplyr::select(-Y,-A)
     boot1 <- reactive({
-      doIPW <- doIPW(); doAIPW=doAIPW();doDCAIPW=doDCAIPW()
-      doManuTMLE=doManuTMLE(); doDCTMLE=doDCTMLE(); doGComp=doGComp()
+      # Extract ALL reactive values BEFORE the parallel loop
+      doIPW_val <- doIPW()
+      doAIPW_val <- doAIPW()
+      doDCAIPW_val <- doDCAIPW()
+      doManuTMLE_val <- doManuTMLE()
+      doDCTMLE_val <- doDCTMLE()
+      doGComp_val <- doGComp()
+      num_cf_val <- num_cf()  # Extract this before the loop!
       
-      boot2 <-foreach(i = 1:N_sims,.errorhandling="stop") %dopar% {
+      boot2 <- foreach(i = 1:N_sims, .errorhandling="stop") %dopar% {
         require(tidyverse)
         require(SuperLearner)
         
         # Initialize dataset
-        if (sims.ver == "plas" | sims.ver =="5var.then.plas"){
+        if (sims.ver == "plas" | sims.ver == "5var.then.plas"){
           plas_data <- data.frame(id = plas_sims$Sim_Data[i],
-                             A = plas_sims$Sim_Data[i + (2*plas_sim_N)],
-                             Y = plas_sims$Sim_Data[i + plas_sim_N])
+                                  A = plas_sims$Sim_Data[i + (2*plas_sim_N)],
+                                  Y = plas_sims$Sim_Data[i + plas_sim_N])
           
           colnames(plas_data) <- c("id", "A", "Y")
           
-          set1 <- left_join(as_tibble(plas_data), as_tibble(plas.copy),by="id")
+          set1 <- left_join(as_tibble(plas_data), as_tibble(plas.copy), by="id")
           tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y)))
-        }else{
+        } else {
           # Initialize dataset
-          # i<-2
           ss <- 600
           set1 <- as_tibble(cbind(C1 = sim_boots[[i]]$C1[1:ss],
                                   C2 = sim_boots[[i]]$C2[1:ss],
@@ -223,23 +239,25 @@ function(input, output) {
                                   C5 = sim_boots[[i]]$C5[1:ss],
                                   A = sim_boots[[i]]$A[1:ss],
                                   Y = sim_boots[[i]]$Y[1:ss]))
-          tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y))) # generate a bounded Y for TMLE
+          tset <- set1 %>% mutate(YT = (Y-min(set1$Y))/(max(set1$Y)- min(set1$Y)))
         }
+        
+        # Use the extracted values (NOT the reactive functions!)
         getRES(set1, tset, aipw_lib, tmle_lib, short_tmle_lib,
-               doIPW = doIPW,
-               doAIPW=doAIPW,
-               doDCAIPW=doDCAIPW,
-               doManuTMLE=doManuTMLE,
-               doDCTMLE=doDCTMLE,doGComp=doGComp,
-               num_cf=num_cf,
-               #control=list()
-               control=control,
-               parallel=F,
+               doIPW = doIPW_val,        # Use extracted value
+               doAIPW = doAIPW_val,      # Use extracted value
+               doDCAIPW = doDCAIPW_val,  # Use extracted value
+               doManuTMLE = doManuTMLE_val, # Use extracted value
+               doDCTMLE = doDCTMLE_val,  # Use extracted value
+               doGComp = doGComp_val,    # Use extracted value
+               num_cf = num_cf_val,      # Use extracted value (NOT num_cf()!)
+               control = control,
+               parallel = F,
                expForm = expForm,
                outForm = outForm
         )
       }
-    boot2
+      boot2
     })
     source("20200816-Result-Summary.R")
     

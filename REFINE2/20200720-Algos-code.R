@@ -176,24 +176,63 @@ getRES <- function(gset, tset, aipw_lib = NULL, tmle_lib = NULL, short_tmle_lib=
   }
   
   if (doDCAIPW==1){
-    
     ptm0 <- proc.time()
-    # DC-AIPW
+    
+    # Add debugging information
+    cat("Debug: Starting DC-AIPW\n")
+    
     outcome <- as.character(as.formula(outForm)[[2]])
     exposure <- as.character(as.formula(expForm)[[2]])
-    DCAIPW <- DCDR_Multiple(data=gset, exposure=exposure, outcome=outcome,
-                            covarsT=all.vars(as.formula(expForm))[-1],
-                            covarsO=all.vars(as.formula(outForm))[-1],
-                            learners=aipw_lib,
-                            control=control, 
-                            num_cf=num_cf,parallel=parallel)
     
-    ATE <- DCAIPW$rd
-    SE <- sqrt(DCAIPW$mvd)
-    TYPE <- "DC-AIPW"
-    ptm1 <- proc.time()
-    t <- round((ptm1 - ptm0)[3],3)
-    res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
+    # Check for NA/NaN values in key variables
+    cat("Debug: Outcome variable:", outcome, "\n")
+    cat("Debug: Exposure variable:", exposure, "\n")
+    cat("Debug: NAs in outcome:", sum(is.na(gset[[outcome]])), "\n")
+    cat("Debug: NAs in exposure:", sum(is.na(gset[[exposure]])), "\n")
+    cat("Debug: Infinite values in outcome:", sum(!is.finite(gset[[outcome]])), "\n")
+    
+    # Check covariates
+    covarsT <- all.vars(as.formula(expForm))[-1]
+    covarsO <- all.vars(as.formula(outForm))[-1]
+    
+    cat("Debug: Treatment covariates:", paste(covarsT, collapse=", "), "\n")
+    cat("Debug: Outcome covariates:", paste(covarsO, collapse=", "), "\n")
+    
+    # Check for NAs in covariates
+    for(var in c(covarsT, covarsO)) {
+      if(var %in% colnames(gset)) {
+        nas <- sum(is.na(gset[[var]]))
+        if(nas > 0) cat("Debug: NAs in", var, ":", nas, "\n")
+      }
+    }
+    
+    # Try-catch around the DCDR_Multiple call
+    tryCatch({
+      DCAIPW <- DCDR_Multiple(data=gset, exposure=exposure, outcome=outcome,
+                              covarsT=covarsT,
+                              covarsO=covarsO,
+                              learners=aipw_lib,
+                              control=control, 
+                              num_cf=num_cf,parallel=parallel)
+      
+      cat("Debug: DCAIPW completed successfully\n")
+      cat("Debug: rd =", DCAIPW$rd, "\n")
+      cat("Debug: mvd =", DCAIPW$mvd, "\n")
+      
+      ATE <- DCAIPW$rd
+      SE <- sqrt(DCAIPW$mvd)
+      TYPE <- "DC-AIPW"
+      ptm1 <- proc.time()
+      t <- round((ptm1 - ptm0)[3],3)
+      res <- rbind(res, cbind(ATE, SE, TYPE,t, no_cores))
+      
+    }, error = function(e) {
+      cat("Error in DCDR_Multiple:", e$message, "\n")
+      cat("Debug: Data dimensions:", dim(gset), "\n")
+      cat("Debug: Data summary:\n")
+      print(summary(gset))
+      stop(e)
+    })
   }
   
   # IPW + GLM
