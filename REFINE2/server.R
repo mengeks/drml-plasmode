@@ -2,6 +2,7 @@ library(shiny)
 
 list.of.packages <- c("shiny","mgcv","nlme","glm2","polspline",  "doRNG","doParallel",
                       "SuperLearner","gam","foreach","splines","nnls",
+                      "randomForest", "xgboost", "RCAL",
                       "Plasmode","table1","readxl","haven","dplyr","purrr","readr","tidyr",       
                       "tibble","tidyverse","ggplot2",
                       "here",
@@ -11,7 +12,7 @@ list.of.packages <- c("shiny","mgcv","nlme","glm2","polspline",  "doRNG","doPara
 
 install.packages(list.of.packages[which(
   sapply(list.of.packages, function(x) {nzchar(system.file(package = x))})==F
-  )])  
+)])  
 
 # install Plasmode
 if (!requireNamespace("Plasmode", quietly = TRUE)) {
@@ -23,7 +24,6 @@ function(input, output) {
   library(haven)
   library(readxl)
   library(table1)
-  library(Plasmode)
   library(SuperLearner)
   library(gam)
   library(doParallel)
@@ -49,34 +49,34 @@ function(input, output) {
   is.par <-  reactive({input$is.par})
   use.par <<- reactive({as.logical(is.par()=="Smooth")})
   
-    sims.ver <- "plas"
-
-    # Effect_Size <<- 6.6
-
-    # plas.seed <- 1111
-
-    ########
-    # parameters for plasmode
-    #######
-    plas_sim_N <- reactive({max(500,input$obs)}); use.subset <- F
-    generateA <- T
-
-
-    ########
-    # parameters for 5 var, 5var.then.plas
-    #######
-    Nsets <- 500
-    Nsamp <- 600
+  sims.ver <- "plas"
   
-    
-    
+  # Effect_Size <<- 6.6
+  
+  # plas.seed <- 1111
+  
+  ########
+  # parameters for plasmode
+  #######
+  plas_sim_N <- reactive({max(10,input$obs)}); use.subset <- F
+  generateA <- T
+  
+  
+  ########
+  # parameters for 5 var, 5var.then.plas
+  #######
+  Nsets <- 500
+  Nsamp <- 600
+  
+  
+  
   
   exp.Form.check <- reactive({
     ds <- read.csv(file = path(), header=TRUE, stringsAsFactors=FALSE)
     # req(prod(all.vars(expr = as.formula(input$expForm)) %in% colnames(ds)) == 1)
     if (prod(all.vars(expr = as.formula(input$expForm)) %in% colnames(ds)) == 0){
       tmp <- all.vars(expr = as.formula(input$expForm))
-      to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in SIMULATION Propensity Score 
+      to.out <- c("Error: Variables (", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ,") are not found in SIMULATION Propensity Score 
              model. Must only contain variables in the dataset. Please re-enter.")
       paste0(to.out,collapse="")
     }
@@ -90,7 +90,7 @@ function(input, output) {
     ds <- read.csv(file = path(), header=TRUE, stringsAsFactors=FALSE)
     if (prod(all.vars(expr = as.formula(input$outForm)) %in% colnames(ds)) == 0){
       tmp <- all.vars(expr = as.formula(input$outForm))
-      to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in SIMULATION Outcome 
+      to.out <- c("Error: Variables (", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ,") are not found in SIMULATION Outcome 
              Model. Must only contain variables in the dataset. Please re-enter.")
       paste0(to.out,collapse="")
     }
@@ -106,7 +106,7 @@ function(input, output) {
     if (prod(all.vars(expr = as.formula(input$expForm.est)) %in% colnames(ds)) == 0){
       
       tmp <- all.vars(expr = as.formula(input$expForm.est))
-      to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in ESTIMATION Propensity Score 
+      to.out <- c("Error: Variables (", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ,") are not found in ESTIMATION Propensity Score 
              model. Must only contain variables in the dataset. Please re-enter.")
       paste0(to.out,collapse="")
     }
@@ -121,7 +121,7 @@ function(input, output) {
     if (prod(all.vars(expr = as.formula(input$outForm.est)) %in% colnames(ds)) == 0){
       
       tmp <- all.vars(expr = as.formula(input$outForm.est))
-      to.out <- c("Error: Variables ", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ," are not found in ESTIMATION Outcome 
+      to.out <- c("Error: Variables (", paste0(tmp[which(!tmp %in% colnames(ds))],collapse=", ")  ,") are not found in ESTIMATION Outcome 
              Model. Must only contain variables in the dataset. Please re-enter.")
       paste0(to.out,collapse="")
     }
@@ -150,11 +150,11 @@ function(input, output) {
       use.par = use.par()
       
       if (use.par == T){
-      #### SMOOTH
+        #### SMOOTH
         aipw_lib <- SL.param
       }
       else{
-      ####  NON-SMOOTH
+        ####  NON-SMOOTH
         aipw_lib <- SL.lib
       }
       set1 <- data.frame(plas.copy)
@@ -205,6 +205,7 @@ function(input, output) {
     plas_sim_N <- plas_sim_N()
     N_sims <- N_sims()
     plas.copy <- plas %>% dplyr::select(-Y,-A)
+    
     boot1 <- reactive({
       # Extract ALL reactive values BEFORE the parallel loop
       doIPW_val <- doIPW()
@@ -216,6 +217,8 @@ function(input, output) {
       num_cf_val <- num_cf()  # Extract this before the loop!
       
       boot2 <- foreach(i = 1:N_sims, .errorhandling="stop") %dopar% {
+        sims.ver <- "plas"
+        
         require(tidyverse)
         require(SuperLearner)
         
@@ -311,5 +314,5 @@ function(input, output) {
       
     })
   })
-
+  
 }
